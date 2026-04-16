@@ -8,6 +8,7 @@
     "test-db": "bun run tests/test-db.ts"
   },
   "dependencies": {
+    "dotenv": "^17.4.2",
     "mysql2": "^3.22.0"
   },
   "devDependencies": {
