@@ -13,8 +13,8 @@ services:
   
   backend:
     build:
-      context: ./src/backend
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: dockerfile
     container_name: proyecto_backend
     restart: always
     ports:
@@ -30,14 +30,14 @@ services:
 
   frontend:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ./frontend
+      dockerfile: dockerfile
     container_name: proyecto_frontend
     restart: always
     ports:
       - "3000:3000"
     volumes:
-      - .:/app
+      - ./frontend:/app
       - /app/node_modules
     depends_on:
       - backend
