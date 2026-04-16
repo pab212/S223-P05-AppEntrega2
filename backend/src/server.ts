@@ -18,7 +18,10 @@ async function createTables() {
       CREATE TABLE IF NOT EXISTS packages (
         id INT AUTO_INCREMENT PRIMARY KEY,
         recipient_name VARCHAR(255) NOT NULL,
+        apartment_number VARCHAR(50) NOT NULL,
         description TEXT,
+        sender VARCHAR(255) NOT NULL,
+        delivery_date TIMESTAMP NULL,
         status ENUM('received', 'delivered', 'pending') DEFAULT 'received',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -34,6 +37,8 @@ await createTables();
 Bun.serve({
   port: PORT,
   async fetch(request) {
+  port: 3001,
+  async fetch(request: Request) {
     const url = new URL(request.url);
     // # Normalizamos el método para comparar siempre en mayúsculas.
     const method = request.method.trim().toUpperCase();
@@ -94,8 +99,8 @@ Bun.serve({
 
     if (method === "POST" && url.pathname === "/api/packages") {
       try {
-        const body = await request.json();
-        const { recipient_name, description, status = "received" } = body;
+        const body = (await request.json()) as Record<string, unknown>;
+        const { recipient_name, apartment_number, description, sender, delivery_date, status = "received" } = body;
 
         if (!recipient_name) {
           return Response.json(
@@ -104,9 +109,23 @@ Bun.serve({
           );
         }
 
+        if (!apartment_number) {
+          return Response.json(
+            { error: "apartment_number es requerido" },
+            { status: 400 }
+          );
+        }
+
+        if (!sender) {
+          return Response.json(
+            { error: "sender es requerido" },
+            { status: 400 }
+          );
+        }
+
         const [result] = await db.query<ResultSetHeader>(
-          "INSERT INTO packages (recipient_name, description, status) VALUES (?, ?, ?)",
-          [recipient_name, description, status]
+          "INSERT INTO packages (recipient_name, apartment_number, description, sender, delivery_date, status) VALUES (?, ?, ?, ?, ?, ?)",
+          [recipient_name, apartment_number, description, sender, delivery_date || null, status]
         );
 
         return Response.json(
@@ -164,6 +183,110 @@ Bun.serve({
       { error: "Ruta no encontrada" },
       { status: 404, headers: corsHeaders }
     );
+    if (request.method === "PUT" && url.pathname.startsWith("/api/packages/")) {
+      try {
+        const id = url.pathname.split("/").pop();
+        const body = (await request.json()) as Record<string, unknown>;
+        const { recipient_name, apartment_number, description, sender, delivery_date, status } = body;
+
+        // Validar que al menos un campo sea proporcionado
+        if (!recipient_name && !apartment_number && !description && !sender && !delivery_date && !status) {
+          return Response.json(
+            { error: "Al menos un campo debe ser proporcionado" },
+            { status: 400 }
+          );
+        }
+
+        // Construir query dinámicamente
+        const updates: string[] = [];
+        const values: unknown[] = [];
+
+        if (recipient_name) {
+          updates.push("recipient_name = ?");
+          values.push(recipient_name);
+        }
+        if (apartment_number) {
+          updates.push("apartment_number = ?");
+          values.push(apartment_number);
+        }
+        if (description) {
+          updates.push("description = ?");
+          values.push(description);
+        }
+        if (sender) {
+          updates.push("sender = ?");
+          values.push(sender);
+        }
+        if (delivery_date) {
+          updates.push("delivery_date = ?");
+          values.push(delivery_date);
+        }
+        if (status) {
+          updates.push("status = ?");
+          values.push(status);
+        }
+
+        values.push(id);
+
+        const [result] = await db.query<ResultSetHeader>(
+          `UPDATE packages SET ${updates.join(", ")} WHERE id = ?`,
+          values
+        );
+
+        if (result.affectedRows === 0) {
+          return Response.json(
+            { error: "Paquete no encontrado" },
+            { status: 404 }
+          );
+        }
+
+        return Response.json({
+          message: "Paquete actualizado exitosamente",
+          id: id,
+        });
+      } catch (error) {
+        return Response.json(
+          {
+            message: "Error actualizando paquete",
+            error: String(error),
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    if (request.method === "DELETE" && url.pathname.startsWith("/api/packages/")) {
+      try {
+        const id = url.pathname.split("/").pop();
+
+        const [result] = await db.query<ResultSetHeader>(
+          "DELETE FROM packages WHERE id = ?",
+          [id]
+        );
+
+        if (result.affectedRows === 0) {
+          return Response.json(
+            { error: "Paquete no encontrado" },
+            { status: 404 }
+          );
+        }
+
+        return Response.json({
+          message: "Paquete eliminado exitosamente",
+          id: id,
+        });
+      } catch (error) {
+        return Response.json(
+          {
+            message: "Error eliminando paquete",
+            error: String(error),
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    return Response.json({ error: "Ruta no encontrada" }, { status: 404 });
   },
 });
 
