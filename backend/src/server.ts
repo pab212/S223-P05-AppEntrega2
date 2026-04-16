@@ -22,7 +22,7 @@ await createTables();
 
 Bun.serve({
   port: 3001,
-  async fetch(request) {
+  async fetch(request: Request) {
     const url = new URL(request.url);
 
     if (request.method === "GET" && url.pathname === "/") {
