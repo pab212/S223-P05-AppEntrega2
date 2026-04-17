@@ -7,6 +7,7 @@
 | Pablo Morales    | @pab212 |
 # Descripción
 RecepBox es una aplicación diseñada para optimizar la recepción y entrega de encomiendas en edificios residenciales o corporativos. Permite registrar envíos, hacer seguimiento y notificar a los destinatarios. Para así mejorar la organización , reducir errores y aumentar la trazabilidad del proceso.
+
 # Requisitos necesarios
 
 - Docker y Docker Compose (para entorno en contendor)
@@ -17,6 +18,14 @@ RecepBox es una aplicación diseñada para optimizar la recepción y entrega de 
 bun install
 bun run dev
 ```
+- Para correr Frontend sin problemas
+```bash
+cd frontend
+npm.cmd install
+npm.cmd run dev
+bun add react-router-dom
+```
+
 ## Docker
 ### Para levantar el contenedor (local)
 ```bash
