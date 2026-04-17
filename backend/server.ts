@@ -1,5 +1,9 @@
+import "dotenv/config";
 import db from "./src/db";
 import type { ResultSetHeader, RowDataPacket } from "mysql2";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+import { OAuth2Client } from "google-auth-library";
 
 type PackageStatus = "received" | "delivered" | "pending";
 
@@ -14,27 +18,42 @@ type PackageRow = RowDataPacket & {
   created_at: string;
 };
 
-// # Estos headers permiten que el frontend corriendo en otro puerto pueda llamar
-// # al backend sin quedar bloqueado por CORS.
+type UserRow = RowDataPacket & {
+  id: number;
+  name: string;
+  email: string;
+  password: string;
+  created_at: string;
+};
+
+type AuthTokenPayload = {
+  id: number;
+  email: string;
+  name: string;
+};
+
+// # Estos headers permiten que frontend y HTMLs de prueba llamen al backend
+// # incluso cuando están corriendo en otro puerto.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-// # Esta lista deja explícitos los estados válidos para validarlos tanto en POST como en PUT.
 const allowedStatuses = new Set<PackageStatus>([
   "received",
   "delivered",
   "pending",
 ]);
 
-// # Este puerto puede cambiarse por variable de entorno.
-// # Si no existe, mantenemos 3001 para no romper el frontend actual.
 const PORT = Number(process.env.PORT || 3001);
+const JWT_SECRET = process.env.JWT_SECRET?.trim() ?? "";
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID?.trim() ?? "";
 
-// # Este helper evita repetir `Response.json(..., { headers: corsHeaders })`
-// # en cada rama del servidor.
+// # Solo creamos el cliente de Google si realmente existe el Client ID.
+// # Así el backend puede seguir funcionando para paquetes aunque SSO no esté configurado.
+const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
+
 const jsonResponse = (body: unknown, init?: ResponseInit) => {
   return Response.json(body, {
     ...init,
@@ -45,7 +64,6 @@ const jsonResponse = (body: unknown, init?: ResponseInit) => {
   });
 };
 
-// # Este helper valida que el valor exista, sea texto y no quede vacío tras hacer trim.
 const getRequiredString = (value: unknown) => {
   if (typeof value !== "string") {
     return null;
@@ -55,8 +73,6 @@ const getRequiredString = (value: unknown) => {
   return normalizedValue ? normalizedValue : null;
 };
 
-// # Este helper nos permite aceptar texto opcional y guardar `null`
-// # cuando el frontend envía vacío o directamente no lo incluye.
 const getOptionalString = (value: unknown) => {
   if (value === undefined || value === null) {
     return null;
@@ -70,25 +86,59 @@ const getOptionalString = (value: unknown) => {
   return normalizedValue ? normalizedValue : null;
 };
 
-// # Esta validación centraliza la verificación del id para las rutas `/api/packages/:id`.
 const parsePackageId = (pathname: string) => {
   const id = Number(pathname.split("/").pop());
   return Number.isInteger(id) && id > 0 ? id : null;
 };
 
-// # Así evitamos aceptar estados inventados que luego rompan consultas o la UI.
 const isPackageStatus = (value: unknown): value is PackageStatus => {
   return typeof value === "string" && allowedStatuses.has(value as PackageStatus);
 };
 
-// # Este helper evita repetir la llamada larga a `hasOwnProperty`
-// # cada vez que validamos updates parciales.
 const hasOwn = (value: Record<string, unknown>, key: string) => {
   return Object.prototype.hasOwnProperty.call(value, key);
 };
 
-// # Este helper lee un paquete puntual después de crear o actualizar,
-// # para devolver al frontend el registro definitivo que quedó en la base de datos.
+const ensureAuthIsConfigured = () => {
+  if (!JWT_SECRET) {
+    throw new Error("JWT_SECRET no está definido en backend/.env");
+  }
+};
+
+const ensureGoogleAuthIsConfigured = () => {
+  ensureAuthIsConfigured();
+
+  if (!GOOGLE_CLIENT_ID || !googleClient) {
+    throw new Error("GOOGLE_CLIENT_ID no está definido en backend/.env");
+  }
+};
+
+const generateToken = (user: AuthTokenPayload) => {
+  ensureAuthIsConfigured();
+
+  return jwt.sign(user, JWT_SECRET, {
+    expiresIn: "2h",
+  });
+};
+
+const verifyAuthHeader = (request: Request) => {
+  ensureAuthIsConfigured();
+
+  const authHeader = request.headers.get("Authorization");
+
+  if (!authHeader) {
+    throw new Error("Falta header Authorization");
+  }
+
+  const parts = authHeader.split(" ");
+
+  if (parts.length !== 2 || parts[0] !== "Bearer") {
+    throw new Error("Formato de token inválido");
+  }
+
+  return jwt.verify(parts[1], JWT_SECRET);
+};
+
 const getPackageById = async (id: number) => {
   const [rows] = await db.query<PackageRow[]>(
     "SELECT * FROM packages WHERE id = ?",
@@ -114,7 +164,7 @@ async function createTables() {
     `);
 
     // # Si la tabla ya existía de una versión anterior, agregamos las columnas nuevas
-    // # una por una para no depender de que la base haya sido recreada desde cero.
+    // # una por una para no depender de recrear toda la base.
     const ensureColumn = async (columnName: string, definition: string) => {
       const [rows] = await db.query<RowDataPacket[]>(
         "SHOW COLUMNS FROM packages LIKE ?",
@@ -146,8 +196,22 @@ async function createTables() {
     );
 
     console.log("Tabla 'packages' creada o ya existe.");
+
+    // # Conservamos la tabla de usuarios que llegó desde develop para no perder
+    // # el trabajo de autenticación local/Google.
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        password VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    console.log("Tabla 'users' creada o ya existe.");
   } catch (error) {
-    console.error("Error creando tabla:", error);
+    console.error("Error creando tablas:", error);
   }
 }
 
@@ -157,11 +221,8 @@ Bun.serve({
   port: PORT,
   async fetch(request: Request) {
     const url = new URL(request.url);
-    // # Normalizamos el método para comparar siempre en mayúsculas y evitar errores por formato.
     const method = request.method.trim().toUpperCase();
 
-    // # Algunos navegadores envían primero un OPTIONS antes del POST/PUT/DELETE.
-    // # Responder aquí evita errores de conexión falsos desde el frontend.
     if (method === "OPTIONS") {
       return new Response(null, {
         status: 204,
@@ -190,8 +251,8 @@ Bun.serve({
 
     if (method === "GET" && url.pathname === "/api/packages") {
       try {
-        // # Permitimos filtros por query string para que el residente vea solo sus encomiendas
-        // # sin tener que descargar todo el historial en el navegador.
+        // # Permitimos filtros por query string para que el frontend no tenga
+        // # que descargar siempre el historial completo.
         const filters: string[] = [];
         const values: unknown[] = [];
 
@@ -251,8 +312,6 @@ Bun.serve({
       try {
         const body = (await request.json()) as Record<string, unknown>;
 
-        // # Cada campo obligatorio se valida por separado para poder responder
-        // # con un mensaje preciso que la UI pueda mostrar tal cual.
         const recipientName = getRequiredString(body.recipient_name);
         const apartmentNumber = getRequiredString(body.apartment_number);
         const sender = getRequiredString(body.sender);
@@ -362,9 +421,6 @@ Bun.serve({
         }
 
         const body = (await request.json()) as Record<string, unknown>;
-
-        // # Armamos la actualización solo con los campos presentes en el body.
-        // # Esto permite que el frontend cambie únicamente el estado sin reenviar todo el paquete.
         const updates: string[] = [];
         const values: unknown[] = [];
 
@@ -416,9 +472,8 @@ Bun.serve({
         }
 
         if (hasOwn(body, "delivery_date")) {
-          const deliveryDate = getOptionalString(body.delivery_date);
           updates.push("delivery_date = ?");
-          values.push(deliveryDate);
+          values.push(getOptionalString(body.delivery_date));
         }
 
         if (hasOwn(body, "status")) {
@@ -510,6 +565,209 @@ Bun.serve({
             error: String(error),
           },
           { status: 500 }
+        );
+      }
+    }
+
+    if (method === "POST" && url.pathname === "/api/auth/register") {
+      try {
+        const body = (await request.json()) as Record<string, unknown>;
+        const name = getRequiredString(body.name);
+        const email = getRequiredString(body.email);
+        const password = getRequiredString(body.password);
+
+        if (!name || !email || !password) {
+          return jsonResponse(
+            { error: "name, email y password son requeridos" },
+            { status: 400 }
+          );
+        }
+
+        const [existingUsers] = await db.query<UserRow[]>(
+          "SELECT * FROM users WHERE email = ?",
+          [email]
+        );
+
+        if (existingUsers.length > 0) {
+          return jsonResponse(
+            { error: "Ya existe un usuario con ese correo" },
+            { status: 409 }
+          );
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const [result] = await db.query<ResultSetHeader>(
+          "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
+          [name, email, hashedPassword]
+        );
+
+        return jsonResponse(
+          {
+            message: "Usuario registrado exitosamente",
+            id: result.insertId,
+          },
+          { status: 201 }
+        );
+      } catch (error) {
+        return jsonResponse(
+          {
+            message: "Error registrando usuario",
+            error: String(error),
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    if (method === "POST" && url.pathname === "/api/auth/login") {
+      try {
+        const body = (await request.json()) as Record<string, unknown>;
+        const email = getRequiredString(body.email);
+        const password = getRequiredString(body.password);
+
+        if (!email || !password) {
+          return jsonResponse(
+            { error: "email y password son requeridos" },
+            { status: 400 }
+          );
+        }
+
+        const [rows] = await db.query<UserRow[]>(
+          "SELECT * FROM users WHERE email = ?",
+          [email]
+        );
+
+        if (rows.length === 0) {
+          return jsonResponse(
+            { error: "Credenciales inválidas" },
+            { status: 401 }
+          );
+        }
+
+        const user = rows[0];
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+
+        if (!isPasswordValid) {
+          return jsonResponse(
+            { error: "Credenciales inválidas" },
+            { status: 401 }
+          );
+        }
+
+        const token = generateToken({
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        });
+
+        return jsonResponse({
+          message: "Inicio de sesión exitoso",
+          token,
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+          },
+        });
+      } catch (error) {
+        return jsonResponse(
+          {
+            message: "Error iniciando sesión",
+            error: String(error),
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    if (method === "POST" && url.pathname === "/api/auth/google") {
+      try {
+        ensureGoogleAuthIsConfigured();
+
+        const body = (await request.json()) as Record<string, unknown>;
+        const token = getRequiredString(body.token);
+
+        if (!token || !googleClient) {
+          return jsonResponse(
+            { error: "Token de Google requerido" },
+            { status: 400 }
+          );
+        }
+
+        const ticket = await googleClient.verifyIdToken({
+          idToken: token,
+          audience: GOOGLE_CLIENT_ID,
+        });
+
+        const payload = ticket.getPayload();
+
+        if (!payload?.email) {
+          return jsonResponse(
+            { error: "Token de Google inválido" },
+            { status: 401 }
+          );
+        }
+
+        const [rows] = await db.query<UserRow[]>(
+          "SELECT * FROM users WHERE email = ?",
+          [payload.email]
+        );
+
+        let user: AuthTokenPayload;
+
+        if (rows.length > 0) {
+          user = {
+            id: rows[0].id,
+            name: rows[0].name,
+            email: rows[0].email,
+          };
+        } else {
+          const [result] = await db.query<ResultSetHeader>(
+            "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
+            [payload.name || "Usuario Google", payload.email, "GOOGLE_LOGIN"]
+          );
+
+          user = {
+            id: result.insertId,
+            name: payload.name || "Usuario Google",
+            email: payload.email,
+          };
+        }
+
+        const appToken = generateToken(user);
+
+        return jsonResponse({
+          message: "Inicio de sesión con Google exitoso",
+          token: appToken,
+          user,
+        });
+      } catch (error) {
+        return jsonResponse(
+          {
+            error: "Error en autenticación SSO con Google",
+            details: String(error),
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    if (method === "GET" && url.pathname === "/api/auth/profile") {
+      try {
+        const decoded = verifyAuthHeader(request);
+
+        return jsonResponse({
+          message: "Acceso autorizado",
+          user: decoded,
+        });
+      } catch (error) {
+        return jsonResponse(
+          {
+            error: "No autorizado",
+            details: String(error),
+          },
+          { status: 401 }
         );
       }
     }
