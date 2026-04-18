@@ -1,6 +1,7 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
+import type { ReactNode } from "react";
 import { useAuth } from "./context/AuthContext";
-import { getHomePathForRole } from "./services/auth";
+import { getHomePathForRole, type Role } from "./services/auth";
 
 import Login from "./pages/Login";
 import Conserje from "./pages/Conserje";
@@ -8,9 +9,40 @@ import Residente from "./pages/Residente";
 import HistorialEncomiendas from "./pages/HistorialEncomiendas";
 import MainLayout from "./layouts/MainLayout";
 
-const App = () => {
+type ProtectedRouteProps = {
+  allowedRole: Role;
+  children: ReactNode;
+};
+
+const ProtectedRoute = ({ allowedRole, children }: ProtectedRouteProps) => {
   const { user } = useAuth();
+
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+
+  // # Si la sesión existe pero el rol no coincide, enviamos al usuario
+  // # a su dashboard real en vez de dejarlo atrapado en una ruta ajena.
+  if (user.role !== allowedRole) {
+    return <Navigate to={getHomePathForRole(user.role)} replace />;
+  }
+
+  return <MainLayout>{children}</MainLayout>;
+};
+
+const App = () => {
+  const { user, isCheckingSession } = useAuth();
   const defaultAuthenticatedRoute = user ? getHomePathForRole(user.role) : "/";
+
+  if (isCheckingSession) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#1f1f1f] px-6 text-center text-white">
+        <p className="text-sm text-gray-300">
+          Validando sesion activa...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <Routes>
@@ -28,52 +60,36 @@ const App = () => {
       <Route
         path="/conserje"
         element={
-          user?.role === "conserje" ? (
-            <MainLayout>
-              <Conserje />
-            </MainLayout>
-          ) : (
-            <Navigate to={defaultAuthenticatedRoute} replace />
-          )
+          <ProtectedRoute allowedRole="conserje">
+            <Conserje />
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/conserje/historial"
         element={
-          user?.role === "conserje" ? (
-            <MainLayout>
-              <HistorialEncomiendas />
-            </MainLayout>
-          ) : (
-            <Navigate to={defaultAuthenticatedRoute} replace />
-          )
+          <ProtectedRoute allowedRole="conserje">
+            <HistorialEncomiendas />
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/residente"
         element={
-          user?.role === "residente" ? (
-            <MainLayout>
-              <HistorialEncomiendas />
-            </MainLayout>
-          ) : (
-            <Navigate to={defaultAuthenticatedRoute} replace />
-          )
+          <ProtectedRoute allowedRole="residente">
+            <HistorialEncomiendas />
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/residente/mis-encomiendas"
         element={
-          user?.role === "residente" ? (
-            <MainLayout>
-              <Residente />
-            </MainLayout>
-          ) : (
-            <Navigate to={defaultAuthenticatedRoute} replace />
-          )
+          <ProtectedRoute allowedRole="residente">
+            <Residente />
+          </ProtectedRoute>
         }
       />
 

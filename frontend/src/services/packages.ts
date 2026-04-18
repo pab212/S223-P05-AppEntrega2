@@ -1,3 +1,5 @@
+import { getStoredAccessToken } from "./auth";
+
 export type PackageStatus = "received" | "delivered" | "pending";
 
 export type PackageItem = {
@@ -49,6 +51,8 @@ type PackageMutationResponse = {
 
 type PackageErrorCode =
   | "NETWORK_ERROR"
+  | "UNAUTHORIZED"
+  | "FORBIDDEN"
   | "INVALID_RESPONSE"
   | "VALIDATION_ERROR"
   | "NOT_FOUND"
@@ -59,7 +63,7 @@ type PackageErrorCode =
 const API_URL = import.meta.env.VITE_API_URL?.trim() || "http://localhost:3001";
 
 // # Esta clase agrega contexto técnico al error para que la UI pueda distinguir
-// # entre un problema de red, una respuesta inválida o un 404 del backend.
+// # entre un problema de sesión, permisos, validación o una respuesta mal formada.
 export class PackageApiError extends Error {
   code: PackageErrorCode;
   status?: number;
@@ -112,7 +116,7 @@ const readJsonResponse = async (response: Response) => {
   } catch {
     throw new PackageApiError(
       "INVALID_RESPONSE",
-      "El servidor respondió con un JSON inválido.",
+      "El servidor respondio con un JSON invalido.",
       response.status
     );
   }
@@ -133,6 +137,25 @@ const extractErrorMessage = (
   return fallbackMessage;
 };
 
+const buildAuthorizedRequest = (init: RequestInit) => {
+  const token = getStoredAccessToken();
+
+  if (!token) {
+    throw new PackageApiError(
+      "UNAUTHORIZED",
+      "Tu sesion ya no es valida. Inicia sesion nuevamente."
+    );
+  }
+
+  return {
+    ...init,
+    headers: {
+      ...(init.headers ?? {}),
+      Authorization: `Bearer ${token}`,
+    },
+  } satisfies RequestInit;
+};
+
 // # Esta función concentra toda la comunicación con `fetch`.
 // # Las pantallas solo trabajan con datos ya validados o con errores claros.
 const request = async (
@@ -143,8 +166,12 @@ const request = async (
   let response: Response;
 
   try {
-    response = await fetch(`${API_URL}${path}`, init);
-  } catch {
+    response = await fetch(`${API_URL}${path}`, buildAuthorizedRequest(init));
+  } catch (error) {
+    if (error instanceof PackageApiError) {
+      throw error;
+    }
+
     throw new PackageApiError(
       "NETWORK_ERROR",
       "No se pudo conectar con el servidor."
@@ -155,11 +182,15 @@ const request = async (
 
   if (!response.ok) {
     const code: PackageErrorCode =
-      response.status === 400
-        ? "VALIDATION_ERROR"
-        : response.status === 404
-          ? "NOT_FOUND"
-          : "UNKNOWN";
+      response.status === 401
+        ? "UNAUTHORIZED"
+        : response.status === 403
+          ? "FORBIDDEN"
+          : response.status === 400
+            ? "VALIDATION_ERROR"
+            : response.status === 404
+              ? "NOT_FOUND"
+              : "UNKNOWN";
 
     throw new PackageApiError(
       code,
@@ -175,7 +206,7 @@ const buildPackageFromUnknown = (value: unknown) => {
   if (!isPackageItem(value)) {
     throw new PackageApiError(
       "INVALID_RESPONSE",
-      "El servidor respondió con un formato de paquete inválido."
+      "El servidor respondio con un formato de paquete invalido."
     );
   }
 
@@ -186,7 +217,7 @@ const buildCollectionResponse = (data: ApiResponseData | null) => {
   if (!Array.isArray(data?.packages)) {
     throw new PackageApiError(
       "INVALID_RESPONSE",
-      "El servidor no devolvió una lista de encomiendas válida."
+      "El servidor no devolvio una lista de encomiendas valida."
     );
   }
 
@@ -199,7 +230,7 @@ const buildMutationResponse = (data: ApiResponseData | null) => {
   if (typeof data?.id !== "number") {
     throw new PackageApiError(
       "INVALID_RESPONSE",
-      "El servidor no devolvió el id del registro."
+      "El servidor no devolvio el id del registro."
     );
   }
 

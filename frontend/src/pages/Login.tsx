@@ -301,9 +301,9 @@ const Login = () => {
 
         if (loginResult.status === "authenticated") {
           handleSuccessfulAuth(
-            loginResult.user.role,
+            loginResult.session.user.role,
             t("auth.success.login", {
-              destination: t(`auth.destination.${loginResult.user.role}`),
+              destination: t(`auth.destination.${loginResult.session.user.role}`),
             })
           );
           return;

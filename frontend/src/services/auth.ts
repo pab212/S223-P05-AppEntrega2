@@ -1,6 +1,6 @@
-export type Role = "conserje" | "residente";
-
 import { getStoredLocale, translateText } from "../i18n/translations";
+
+export type Role = "conserje" | "residente";
 
 export type AuthUser = {
   id: string;
@@ -8,6 +8,11 @@ export type AuthUser = {
   name: string;
   email: string;
   username: string;
+};
+
+export type AuthSession = {
+  token: string;
+  user: AuthUser;
 };
 
 export type LoginCredentials = {
@@ -33,19 +38,16 @@ export type PendingOtpChallenge = {
 export type LoginResult =
   | {
       status: "authenticated";
-      user: AuthUser;
+      session: AuthSession;
     }
   | {
       status: "otp_required";
       challenge: PendingOtpChallenge;
     };
 
-type StoredUser = AuthUser & {
-  password: string;
-};
-
 type LoginApiResponse = {
   message?: string;
+  token?: string;
   user?: Partial<AuthUser>;
   requiresOtp?: boolean;
   otpSessionId?: string;
@@ -55,11 +57,19 @@ type LoginApiResponse = {
 
 type RegisterApiResponse = {
   message?: string;
+  token?: string;
   user?: Partial<AuthUser>;
 };
 
 type VerifyOtpApiResponse = {
   message?: string;
+  token?: string;
+  user?: Partial<AuthUser>;
+};
+
+type ProfileApiResponse = {
+  message?: string;
+  error?: string;
   user?: Partial<AuthUser>;
 };
 
@@ -68,105 +78,22 @@ type AuthErrorCode =
   | "USER_ALREADY_EXISTS"
   | "INVALID_OTP"
   | "OTP_EXPIRED"
+  | "UNAUTHORIZED"
   | "NETWORK_ERROR"
   | "INVALID_RESPONSE"
   | "UNKNOWN";
 
-type LocalOtpChallenge = PendingOtpChallenge & {
-  otpCode: string;
-  user: StoredUser;
-};
+const AUTH_API_URL =
+  import.meta.env.VITE_AUTH_API_URL?.trim() || "http://localhost:3001/api/auth";
+
+export const AUTH_STORAGE_KEY = "encombox.auth.session";
 
 const translateAuth = (key: string) => {
   return translateText(getStoredLocale(), key);
 };
 
-// # Estos usuarios semilla permiten probar la interfaz mientras no exista un backend real.
-const DEMO_USERS: StoredUser[] = [
-  {
-    id: "con-001",
-    role: "conserje",
-    name: "Camila Torres",
-    email: "conserje@encombox.cl",
-    username: "conserje",
-    password: "Conserje2026!",
-  },
-  {
-    id: "res-001",
-    role: "residente",
-    name: "Matias Rojas",
-    email: "residente@encombox.cl",
-    username: "residente",
-    password: "Residente2026!",
-  },
-];
-
-const AUTH_API_URL =
-  import.meta.env.VITE_AUTH_API_URL?.trim() || "http://localhost:3001/api/auth";
-const REGISTERED_USERS_STORAGE_KEY = "encombox.auth.registered-users";
-const OTP_LENGTH = 6;
-const OTP_EXPIRATION_MINUTES = 5;
-const localOtpChallenges = new Map<string, LocalOtpChallenge>();
-
-const wait = (milliseconds: number) =>
-  new Promise((resolve) => window.setTimeout(resolve, milliseconds));
-
-const normalizeIdentifier = (value: string) => value.trim().toLowerCase();
-
 const isRole = (value: unknown): value is Role => {
   return value === "conserje" || value === "residente";
-};
-
-const isStoredUser = (value: unknown): value is StoredUser => {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const user = value as Record<string, unknown>;
-
-  return (
-    typeof user.id === "string" &&
-    typeof user.name === "string" &&
-    typeof user.email === "string" &&
-    typeof user.username === "string" &&
-    typeof user.password === "string" &&
-    isRole(user.role)
-  );
-};
-
-const getRegisteredUsers = (): StoredUser[] => {
-  const storedUsers = window.localStorage.getItem(REGISTERED_USERS_STORAGE_KEY);
-
-  if (!storedUsers) {
-    return [];
-  }
-
-  try {
-    const parsedUsers: unknown = JSON.parse(storedUsers);
-
-    return Array.isArray(parsedUsers)
-      ? parsedUsers.filter((user) => isStoredUser(user))
-      : [];
-  } catch {
-    return [];
-  }
-};
-
-const saveRegisteredUsers = (users: StoredUser[]) => {
-  window.localStorage.setItem(
-    REGISTERED_USERS_STORAGE_KEY,
-    JSON.stringify(users)
-  );
-};
-
-const getAllUsers = () => {
-  // # Mezclamos usuarios demo y usuarios creados en el navegador para que ambos puedan iniciar sesión.
-  return [...DEMO_USERS, ...getRegisteredUsers()];
-};
-
-const sanitizeStoredUser = (user: StoredUser): AuthUser => {
-  const { password: _password, ...safeUser } = user;
-  return safeUser;
 };
 
 const buildUserFromApi = (responseUser: Partial<AuthUser>): AuthUser => {
@@ -192,6 +119,29 @@ const buildUserFromApi = (responseUser: Partial<AuthUser>): AuthUser => {
   };
 };
 
+const buildSessionFromApi = (
+  response: Pick<LoginApiResponse, "token" | "user">
+): AuthSession => {
+  if (typeof response.token !== "string" || !response.token.trim()) {
+    throw new AuthError(
+      "INVALID_RESPONSE",
+      translateAuth("auth.errors.invalidResponse")
+    );
+  }
+
+  if (!response.user) {
+    throw new AuthError(
+      "INVALID_RESPONSE",
+      translateAuth("auth.errors.invalidResponse")
+    );
+  }
+
+  return {
+    token: response.token,
+    user: buildUserFromApi(response.user),
+  };
+};
+
 const buildOtpChallenge = (
   response: Pick<LoginApiResponse, "otpSessionId" | "otpExpiresAt" | "otpCode">
 ): PendingOtpChallenge => {
@@ -209,36 +159,6 @@ const buildOtpChallenge = (
     otpSessionId: response.otpSessionId,
     otpExpiresAt: response.otpExpiresAt,
     otpCode: response.otpCode,
-  };
-};
-
-const createLocalOtpCode = () => {
-  const maxValue = 10 ** OTP_LENGTH;
-  return Math.floor(Math.random() * maxValue)
-    .toString()
-    .padStart(OTP_LENGTH, "0");
-};
-
-const createLocalOtpChallenge = (user: StoredUser): PendingOtpChallenge => {
-  const otpCode = createLocalOtpCode();
-  const otpSessionId = crypto.randomUUID();
-  const otpExpiresAt = new Date(
-    Date.now() + OTP_EXPIRATION_MINUTES * 60 * 1000
-  ).toISOString();
-
-  // # Guardamos el OTP en memoria para poder simular el segundo factor cuando
-  // # el proyecto corre solo con frontend.
-  localOtpChallenges.set(otpSessionId, {
-    otpSessionId,
-    otpExpiresAt,
-    otpCode,
-    user,
-  });
-
-  return {
-    otpSessionId,
-    otpExpiresAt,
-    otpCode,
   };
 };
 
@@ -309,47 +229,13 @@ const authenticateWithApi = async (
     };
   }
 
-  if (!responseData?.user) {
-    throw new AuthError(
-      "INVALID_RESPONSE",
-      translateAuth("auth.errors.invalidResponse")
-    );
-  }
-
   return {
     status: "authenticated",
-    user: buildUserFromApi(responseData.user),
+    session: buildSessionFromApi(responseData ?? {}),
   };
 };
 
-const authenticateWithLocalUsers = async (
-  credentials: LoginCredentials
-): Promise<LoginResult> => {
-  // # Este fallback mantiene el flujo usable incluso si el backend aún no está levantado.
-  await wait(900);
-
-  const normalizedIdentifier = normalizeIdentifier(credentials.identifier);
-  const matchedUser = getAllUsers().find(
-    (user) =>
-      user.role === credentials.role &&
-      (user.email === normalizedIdentifier ||
-        user.username === normalizedIdentifier)
-  );
-
-  if (!matchedUser || matchedUser.password !== credentials.password) {
-    throw new AuthError(
-      "INVALID_CREDENTIALS",
-      translateAuth("auth.errors.invalidCredentials")
-    );
-  }
-
-  return {
-    status: "otp_required",
-    challenge: createLocalOtpChallenge(matchedUser),
-  };
-};
-
-const registerWithApi = async (data: RegisterData): Promise<AuthUser> => {
+const registerWithApi = async (data: RegisterData): Promise<AuthSession> => {
   let response: Response;
 
   try {
@@ -389,55 +275,13 @@ const registerWithApi = async (data: RegisterData): Promise<AuthUser> => {
     );
   }
 
-  if (!responseData?.user) {
-    throw new AuthError(
-      "INVALID_RESPONSE",
-      translateAuth("auth.errors.invalidResponse")
-    );
-  }
-
-  return buildUserFromApi(responseData.user);
-};
-
-const registerWithLocalUsers = async (data: RegisterData): Promise<AuthUser> => {
-  // # El registro local guarda cuentas nuevas en localStorage para reutilizarlas después en el login.
-  await wait(1200);
-
-  const normalizedEmail = normalizeIdentifier(data.email);
-  const normalizedUsername = normalizeIdentifier(data.username);
-  const users = getAllUsers();
-
-  const alreadyExists = users.some(
-    (user) =>
-      user.email === normalizedEmail || user.username === normalizedUsername
-  );
-
-  if (alreadyExists) {
-    throw new AuthError(
-      "USER_ALREADY_EXISTS",
-      translateAuth("auth.errors.userAlreadyExists")
-    );
-  }
-
-  const newUser: StoredUser = {
-    id: `usr-${crypto.randomUUID()}`,
-    role: data.role,
-    name: data.name.trim(),
-    email: normalizedEmail,
-    username: normalizedUsername,
-    password: data.password,
-  };
-
-  const registeredUsers = getRegisteredUsers();
-  saveRegisteredUsers([...registeredUsers, newUser]);
-
-  return sanitizeStoredUser(newUser);
+  return buildSessionFromApi(responseData ?? {});
 };
 
 const verifyOtpWithApi = async (
   challenge: PendingOtpChallenge,
   otpCode: string
-): Promise<AuthUser> => {
+): Promise<AuthSession> => {
   let response: Response;
 
   try {
@@ -473,7 +317,103 @@ const verifyOtpWithApi = async (
     );
   }
 
-  if (!responseData?.user) {
+  return buildSessionFromApi(responseData ?? {});
+};
+
+const isStoredSession = (value: unknown): value is AuthSession => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const session = value as Record<string, unknown>;
+  const user =
+    typeof session.user === "object" && session.user !== null
+      ? (session.user as Record<string, unknown>)
+      : null;
+
+  return (
+    typeof session.token === "string" &&
+    !!session.token.trim() &&
+    !!user &&
+    typeof user.id === "string" &&
+    typeof user.name === "string" &&
+    typeof user.email === "string" &&
+    typeof user.username === "string" &&
+    isRole(user.role)
+  );
+};
+
+export const getStoredSession = (): AuthSession | null => {
+  const storedSession = window.localStorage.getItem(AUTH_STORAGE_KEY);
+
+  if (!storedSession) {
+    return null;
+  }
+
+  try {
+    const parsedSession: unknown = JSON.parse(storedSession);
+    return isStoredSession(parsedSession) ? parsedSession : null;
+  } catch {
+    return null;
+  }
+};
+
+export const saveStoredSession = (session: AuthSession) => {
+  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+};
+
+export const clearStoredSession = () => {
+  window.localStorage.removeItem(AUTH_STORAGE_KEY);
+};
+
+export const getStoredAccessToken = () => {
+  return getStoredSession()?.token ?? null;
+};
+
+export const authenticateUser = async (
+  credentials: LoginCredentials
+): Promise<LoginResult> => {
+  return authenticateWithApi(credentials);
+};
+
+export const verifyOtp = async (
+  challenge: PendingOtpChallenge,
+  otpCode: string
+): Promise<AuthSession> => {
+  return verifyOtpWithApi(challenge, otpCode.trim());
+};
+
+export const registerUser = async (data: RegisterData): Promise<AuthSession> => {
+  return registerWithApi(data);
+};
+
+export const validateStoredSession = async (token: string): Promise<AuthUser> => {
+  let response: Response;
+
+  try {
+    response = await fetch(`${AUTH_API_URL}/profile`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch {
+    throw new AuthError(
+      "NETWORK_ERROR",
+      translateAuth("auth.errors.networkLogin")
+    );
+  }
+
+  const responseData = await parseJsonResponse<ProfileApiResponse>(response);
+
+  if (response.status === 401) {
+    throw new AuthError(
+      "UNAUTHORIZED",
+      responseData?.error ?? translateAuth("auth.errors.invalidCredentials")
+    );
+  }
+
+  if (!response.ok || !responseData?.user) {
     throw new AuthError(
       "INVALID_RESPONSE",
       translateAuth("auth.errors.invalidResponse")
@@ -481,85 +421,6 @@ const verifyOtpWithApi = async (
   }
 
   return buildUserFromApi(responseData.user);
-};
-
-const verifyOtpWithLocalUsers = async (
-  challenge: PendingOtpChallenge,
-  otpCode: string
-): Promise<AuthUser> => {
-  await wait(700);
-
-  const storedChallenge = localOtpChallenges.get(challenge.otpSessionId);
-
-  if (!storedChallenge) {
-    throw new AuthError("OTP_EXPIRED", translateAuth("auth.errors.otpExpired"));
-  }
-
-  const expiresAtTime = new Date(storedChallenge.otpExpiresAt).getTime();
-
-  if (Number.isNaN(expiresAtTime) || expiresAtTime < Date.now()) {
-    localOtpChallenges.delete(challenge.otpSessionId);
-    throw new AuthError("OTP_EXPIRED", translateAuth("auth.errors.otpExpired"));
-  }
-
-  if (storedChallenge.otpCode !== otpCode) {
-    throw new AuthError("INVALID_OTP", translateAuth("auth.errors.invalidOtp"));
-  }
-
-  localOtpChallenges.delete(challenge.otpSessionId);
-  return sanitizeStoredUser(storedChallenge.user);
-};
-
-export const authenticateUser = async (
-  credentials: LoginCredentials
-): Promise<LoginResult> => {
-  try {
-    return await authenticateWithApi(credentials);
-  } catch (error) {
-    if (
-      error instanceof AuthError &&
-      error.code !== "NETWORK_ERROR"
-    ) {
-      throw error;
-    }
-  }
-
-  return authenticateWithLocalUsers(credentials);
-};
-
-export const verifyOtp = async (
-  challenge: PendingOtpChallenge,
-  otpCode: string
-): Promise<AuthUser> => {
-  const normalizedOtp = otpCode.trim();
-
-  try {
-    return await verifyOtpWithApi(challenge, normalizedOtp);
-  } catch (error) {
-    if (
-      error instanceof AuthError &&
-      error.code !== "NETWORK_ERROR"
-    ) {
-      throw error;
-    }
-  }
-
-  return verifyOtpWithLocalUsers(challenge, normalizedOtp);
-};
-
-export const registerUser = async (data: RegisterData): Promise<AuthUser> => {
-  try {
-    return await registerWithApi(data);
-  } catch (error) {
-    if (
-      error instanceof AuthError &&
-      error.code !== "NETWORK_ERROR"
-    ) {
-      throw error;
-    }
-  }
-
-  return registerWithLocalUsers(data);
 };
 
 export const getHomePathForRole = (role: Role) => {

@@ -207,6 +207,65 @@ const verifyAuthHeader = (request: Request) => {
   return jwt.verify(parts[1], JWT_SECRET);
 };
 
+const isAuthTokenPayload = (value: unknown): value is AuthTokenPayload => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const payload = value as Record<string, unknown>;
+
+  return (
+    typeof payload.id === "number" &&
+    typeof payload.email === "string" &&
+    typeof payload.name === "string" &&
+    typeof payload.username === "string" &&
+    isUserRole(payload.role)
+  );
+};
+
+const getAuthenticatedUser = (request: Request) => {
+  const decodedToken = verifyAuthHeader(request);
+
+  if (!isAuthTokenPayload(decodedToken)) {
+    throw new Error("Payload de autenticacion invalido");
+  }
+
+  return decodedToken;
+};
+
+const ensureAuthenticatedRequest = (request: Request) => {
+  try {
+    return {
+      user: getAuthenticatedUser(request),
+      response: null,
+    };
+  } catch (error) {
+    return {
+      user: null,
+      response: jsonResponse(
+        {
+          error: "No autorizado",
+          details: String(error),
+        },
+        { status: 401 }
+      ),
+    };
+  }
+};
+
+const ensureRoleAccess = (user: AuthTokenPayload, role: UserRole) => {
+  if (user.role !== role) {
+    return jsonResponse(
+      {
+        error: "No tienes permisos para realizar esta accion",
+      },
+      { status: 403 }
+    );
+  }
+
+  return null;
+};
+
 const getPackageById = async (id: number) => {
   const [rows] = await db.query<PackageRow[]>(
     "SELECT * FROM packages WHERE id = ?",
@@ -350,6 +409,12 @@ Bun.serve({
 
     if (method === "GET" && url.pathname === "/api/packages") {
       try {
+        const auth = ensureAuthenticatedRequest(request);
+
+        if (auth.response) {
+          return auth.response;
+        }
+
         // # Permitimos filtros por query string para que el frontend no tenga
         // # que descargar siempre el historial completo.
         const filters: string[] = [];
@@ -385,6 +450,13 @@ Bun.serve({
           values.push(status);
         }
 
+        if (auth.user.role === "residente") {
+          // # Aunque el frontend ya filtra la vista del residente, repetimos la regla
+          // # en backend para que no pueda consultar encomiendas de otros usuarios.
+          filters.push("recipient_name = ?");
+          values.push(auth.user.name);
+        }
+
         const whereClause =
           filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
 
@@ -409,6 +481,18 @@ Bun.serve({
 
     if (method === "POST" && url.pathname === "/api/packages") {
       try {
+        const auth = ensureAuthenticatedRequest(request);
+
+        if (auth.response) {
+          return auth.response;
+        }
+
+        const roleResponse = ensureRoleAccess(auth.user, "conserje");
+
+        if (roleResponse) {
+          return roleResponse;
+        }
+
         const body = (await request.json()) as Record<string, unknown>;
 
         const recipientName = getRequiredString(body.recipient_name);
@@ -482,6 +566,12 @@ Bun.serve({
 
     if (method === "GET" && url.pathname.startsWith("/api/packages/")) {
       try {
+        const auth = ensureAuthenticatedRequest(request);
+
+        if (auth.response) {
+          return auth.response;
+        }
+
         const id = parsePackageId(url.pathname);
 
         if (!id) {
@@ -494,6 +584,16 @@ Bun.serve({
           return jsonResponse(
             { error: "Paquete no encontrado" },
             { status: 404 }
+          );
+        }
+
+        if (
+          auth.user.role === "residente" &&
+          packageItem.recipient_name !== auth.user.name
+        ) {
+          return jsonResponse(
+            { error: "No tienes permisos para ver este paquete" },
+            { status: 403 }
           );
         }
 
@@ -513,6 +613,18 @@ Bun.serve({
 
     if (method === "PUT" && url.pathname.startsWith("/api/packages/")) {
       try {
+        const auth = ensureAuthenticatedRequest(request);
+
+        if (auth.response) {
+          return auth.response;
+        }
+
+        const roleResponse = ensureRoleAccess(auth.user, "conserje");
+
+        if (roleResponse) {
+          return roleResponse;
+        }
+
         const id = parsePackageId(url.pathname);
 
         if (!id) {
@@ -635,6 +747,18 @@ Bun.serve({
 
     if (method === "DELETE" && url.pathname.startsWith("/api/packages/")) {
       try {
+        const auth = ensureAuthenticatedRequest(request);
+
+        if (auth.response) {
+          return auth.response;
+        }
+
+        const roleResponse = ensureRoleAccess(auth.user, "conserje");
+
+        if (roleResponse) {
+          return roleResponse;
+        }
+
         const id = parsePackageId(url.pathname);
 
         if (!id) {
@@ -982,11 +1106,11 @@ Bun.serve({
 
     if (method === "GET" && url.pathname === "/api/auth/profile") {
       try {
-        const decoded = verifyAuthHeader(request);
+        const decoded = getAuthenticatedUser(request);
 
         return jsonResponse({
           message: "Acceso autorizado",
-          user: decoded,
+          user: buildSafeUser(decoded),
         });
       } catch (error) {
         return jsonResponse(
