@@ -1,9 +1,10 @@
 import { useEffect, useEffectEvent, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import {
+  PackageApiError,
   fetchPackages,
   updatePackage,
   type PackageItem,
@@ -118,8 +119,9 @@ const isDateAfterToday = (dateValue: string, todayValue: string) => {
 
 const HistorialEncomiendas = () => {
   const { t, localeTag } = useI18n();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const navigationState = (location.state ?? {}) as HistorialLocationState;
 
@@ -184,6 +186,15 @@ const HistorialEncomiendas = () => {
       setPackages(nextPackages);
     } catch (error) {
       console.error(error);
+
+      if (
+        error instanceof PackageApiError &&
+        error.code === "UNAUTHORIZED"
+      ) {
+        logout();
+        navigate("/", { replace: true });
+        return;
+      }
 
       setErrorMessage(
         error instanceof Error ? error.message : t("historial.error.network")
@@ -302,6 +313,15 @@ const HistorialEncomiendas = () => {
     } catch (error) {
       console.error(error);
 
+      if (
+        error instanceof PackageApiError &&
+        error.code === "UNAUTHORIZED"
+      ) {
+        logout();
+        navigate("/", { replace: true });
+        return;
+      }
+
       setStatusMessage(
         error instanceof Error
           ? error.message
@@ -369,6 +389,15 @@ const HistorialEncomiendas = () => {
       handleCancelEdit();
     } catch (error) {
       console.error(error);
+
+      if (
+        error instanceof PackageApiError &&
+        error.code === "UNAUTHORIZED"
+      ) {
+        logout();
+        navigate("/", { replace: true });
+        return;
+      }
 
       setStatusMessage(
         error instanceof Error ? error.message : t("historial.edit.error")

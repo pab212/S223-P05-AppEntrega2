@@ -2,23 +2,26 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
   authenticateUser,
+  clearStoredSession,
   getAuthErrorMessage,
+  getStoredSession,
   registerUser,
+  saveStoredSession,
   type AuthUser,
   type LoginCredentials,
   type LoginResult,
   type PendingOtpChallenge,
   type RegisterData,
   type Role,
+  validateStoredSession,
   verifyOtp as verifyOtpCode,
 } from "../services/auth";
-
-const AUTH_STORAGE_KEY = "encombox.auth.session";
 
 interface AuthContextType {
   user: AuthUser | null;
   authError: string;
   isAuthenticating: boolean;
+  isCheckingSession: boolean;
   login: (credentials: LoginCredentials) => Promise<LoginResult>;
   verifyOtp: (
     challenge: PendingOtpChallenge,
@@ -31,51 +34,58 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const isValidStoredUser = (value: unknown): value is AuthUser => {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const user = value as Record<string, unknown>;
-
-  return (
-    typeof user.id === "string" &&
-    typeof user.name === "string" &&
-    typeof user.email === "string" &&
-    typeof user.username === "string" &&
-    (user.role === "conserje" || user.role === "residente")
-  );
-};
-
-const getStoredUser = (): AuthUser | null => {
-  const storedSession = window.localStorage.getItem(AUTH_STORAGE_KEY);
-
-  if (!storedSession) {
-    return null;
-  }
-
-  try {
-    const parsedSession: unknown = JSON.parse(storedSession);
-    return isValidStoredUser(parsedSession) ? parsedSession : null;
-  } catch {
-    return null;
-  }
-};
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<AuthUser | null>(getStoredUser);
+  const [initialSession] = useState(() => getStoredSession());
+
+  const [user, setUser] = useState<AuthUser | null>(initialSession?.user ?? null);
   const [authError, setAuthError] = useState("");
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(
+    initialSession !== null
+  );
 
   useEffect(() => {
-    // # Persistimos solo la sesión limpia del usuario para restaurar acceso tras recargar la app.
-    if (user) {
-      window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+    if (!initialSession) {
       return;
     }
 
-    window.localStorage.removeItem(AUTH_STORAGE_KEY);
-  }, [user]);
+    let isCancelled = false;
+
+    const restoreSession = async () => {
+      try {
+        // # Revalidamos la sesión guardada contra el backend para impedir que
+        // # una pestaña reutilice un token vencido solo porque seguía en localStorage.
+        const validatedUser = await validateStoredSession(initialSession.token);
+
+        if (isCancelled) {
+          return;
+        }
+
+        saveStoredSession({
+          token: initialSession.token,
+          user: validatedUser,
+        });
+        setUser(validatedUser);
+      } catch {
+        if (isCancelled) {
+          return;
+        }
+
+        clearStoredSession();
+        setUser(null);
+      } finally {
+        if (!isCancelled) {
+          setIsCheckingSession(false);
+        }
+      }
+    };
+
+    void restoreSession();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [initialSession]);
 
   const login = async (credentials: LoginCredentials) => {
     // # Login y registro comparten este estado para bloquear la UI y mostrar feedback consistente.
@@ -86,7 +96,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const loginResult = await authenticateUser(credentials);
 
       if (loginResult.status === "authenticated") {
-        setUser(loginResult.user);
+        saveStoredSession(loginResult.session);
+        setUser(loginResult.session.user);
       }
 
       return loginResult;
@@ -106,9 +117,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAuthError("");
 
     try {
-      const authenticatedUser = await verifyOtpCode(challenge, otpCode);
-      setUser(authenticatedUser);
-      return authenticatedUser;
+      const authenticatedSession = await verifyOtpCode(challenge, otpCode);
+      saveStoredSession(authenticatedSession);
+      setUser(authenticatedSession.user);
+      return authenticatedSession.user;
     } catch (error) {
       setAuthError(getAuthErrorMessage(error));
       throw error;
@@ -122,9 +134,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAuthError("");
 
     try {
-      const registeredUser = await registerUser(data);
-      setUser(registeredUser);
-      return registeredUser;
+      const registeredSession = await registerUser(data);
+      saveStoredSession(registeredSession);
+      setUser(registeredSession.user);
+      return registeredSession.user;
     } catch (error) {
       setAuthError(getAuthErrorMessage(error));
       throw error;
@@ -134,6 +147,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = () => {
+    clearStoredSession();
     setUser(null);
     setAuthError("");
   };
@@ -148,6 +162,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user,
         authError,
         isAuthenticating,
+        isCheckingSession,
         login,
         verifyOtp,
         register,

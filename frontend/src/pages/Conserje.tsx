@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
-import { createPackage } from "../services/packages";
+import { PackageApiError, createPackage } from "../services/packages";
 
 // # Este tipo representa exactamente los nombres que hoy espera el backend.
 // # Así evitamos tener que traducir campos antes del fetch.
@@ -77,6 +78,7 @@ const isDateAfterToday = (dateValue: string, todayValue: string) => {
 
 const Conserje = () => {
   const { t } = useI18n();
+  const { logout } = useAuth();
   // # Esta navegación nos permite llevar al usuario al historial tras registrar la encomienda.
   const navigate = useNavigate();
 
@@ -233,6 +235,17 @@ const Conserje = () => {
       });
     } catch (error) {
       console.error(error);
+
+      // # Si el backend rechaza la sesión, sacamos al usuario del área protegida
+      // # para que no siga operando con un token vencido o inexistente.
+      if (
+        error instanceof PackageApiError &&
+        error.code === "UNAUTHORIZED"
+      ) {
+        logout();
+        navigate("/", { replace: true });
+        return;
+      }
 
       setErrorMessage(
         error instanceof Error
