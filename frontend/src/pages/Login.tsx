@@ -102,6 +102,11 @@ const Login = () => {
         label: t("common.roleLabel.conserje"),
         description: t("auth.roleDescription.conserje"),
       },
+      {
+        value: "administrador" as const,
+        label: t("common.roleLabel.administrador"),
+        description: t("auth.roleDescription.administrador"),
+      },
     ],
     [t]
   );
@@ -544,7 +549,7 @@ const Login = () => {
                 <p className="text-sm font-medium text-white/85">
                   {t("auth.selectRole")}
                 </p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
                   {roleOptions.map((option) => {
                     const isSelected = formData.role === option.value;
 

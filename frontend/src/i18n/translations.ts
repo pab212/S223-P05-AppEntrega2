@@ -26,12 +26,15 @@ const translations: Record<Locale, Record<string, string>> = {
     "common.cancel": "Cancelar",
     "common.role.residente": "residente",
     "common.role.conserje": "conserje",
+    "common.role.administrador": "administrador",
     "common.roleLabel.residente": "Residente",
     "common.roleLabel.conserje": "Conserje",
+    "common.roleLabel.administrador": "Administrador",
     "nav.registerPackage": "Registrar encomienda",
     "nav.history": "Historial",
     "nav.packageHistory": "Historial de encomiendas",
     "nav.myPackages": "Mis encomiendas",
+    "nav.userManagement": "Gestión de usuarios",
     "auth.mode.login": "Iniciar sesión",
     "auth.mode.register": "Registrarse",
     "auth.title.login": "Iniciar sesión",
@@ -70,6 +73,8 @@ const translations: Record<Locale, Record<string, string>> = {
       "Revisa el estado y retiro de tus encomiendas.",
     "auth.roleDescription.conserje":
       "Administra ingresos e historial de encomiendas.",
+    "auth.roleDescription.administrador":
+      "Gestiona usuarios y roles del sistema.",
     "auth.field.name": "Nombre completo",
     "auth.field.email": "Email",
     "auth.field.username": "Nombre de usuario",
@@ -84,6 +89,8 @@ const translations: Record<Locale, Record<string, string>> = {
       "Ej: residente o residente@encombox.cl",
     "auth.placeholder.identifier.conserje":
       "Ej: conserje o conserje@encombox.cl",
+    "auth.placeholder.identifier.administrador":
+      "Ej: admin o admin@encombox.cl",
     "auth.placeholder.password.login": "Ingresa tu contraseña",
     "auth.placeholder.password.register": "Crea una contraseña segura",
     "auth.placeholder.confirmPassword": "Repite tu contraseña",
@@ -115,6 +122,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "auth.status.verifyingOtp": "Validando OTP...",
     "auth.destination.residente": "panel del residente",
     "auth.destination.conserje": "panel de conserjería",
+    "auth.destination.administrador": "panel de administración",
     "auth.otpSummary":
       "Segundo factor para {{role}} con identificador {{identifier}}.",
     "auth.otpExpiresAt": "El código expira a las {{expiresAt}}.",
@@ -269,12 +277,15 @@ const translations: Record<Locale, Record<string, string>> = {
     "common.cancel": "Cancel",
     "common.role.residente": "resident",
     "common.role.conserje": "concierge",
+    "common.role.administrador": "administrator",
     "common.roleLabel.residente": "Resident",
     "common.roleLabel.conserje": "Concierge",
+    "common.roleLabel.administrador": "Administrator",
     "nav.registerPackage": "Register package",
     "nav.history": "History",
     "nav.packageHistory": "Package history",
     "nav.myPackages": "My packages",
+    "nav.userManagement": "User management",
     "auth.mode.login": "Sign in",
     "auth.mode.register": "Sign up",
     "auth.title.login": "Sign in",
@@ -312,6 +323,8 @@ const translations: Record<Locale, Record<string, string>> = {
       "Track the status and pickup of your packages.",
     "auth.roleDescription.conserje":
       "Manage incoming packages and their history.",
+    "auth.roleDescription.administrador":
+      "Manage users and system roles.",
     "auth.field.name": "Full name",
     "auth.field.email": "Email",
     "auth.field.username": "Username",
@@ -326,6 +339,8 @@ const translations: Record<Locale, Record<string, string>> = {
       "Example: residente or residente@encombox.cl",
     "auth.placeholder.identifier.conserje":
       "Example: conserje or conserje@encombox.cl",
+    "auth.placeholder.identifier.administrador":
+      "Example: admin or admin@encombox.cl",
     "auth.placeholder.password.login": "Enter your password",
     "auth.placeholder.password.register": "Create a secure password",
     "auth.placeholder.confirmPassword": "Repeat your password",
@@ -355,6 +370,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "auth.status.verifyingOtp": "Verifying OTP...",
     "auth.destination.residente": "resident dashboard",
     "auth.destination.conserje": "concierge dashboard",
+    "auth.destination.administrador": "administration panel",
     "auth.otpSummary":
       "Second factor for {{role}} using identifier {{identifier}}.",
     "auth.otpExpiresAt": "The code expires at {{expiresAt}}.",

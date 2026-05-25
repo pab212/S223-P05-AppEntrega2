@@ -23,7 +23,7 @@ type UserRow = RowDataPacket & {
   name: string;
   email: string;
   username: string;
-  role: "conserje" | "residente";
+  role: "conserje" | "residente" | "administrador";
   password: string;
   otp_code_hash: string | null;
   otp_expires_at: string | null;
@@ -36,7 +36,7 @@ type AuthTokenPayload = {
   email: string;
   name: string;
   username: string;
-  role: "conserje" | "residente";
+  role: "conserje" | "residente" | "administrador";
 };
 
 type UserRole = AuthTokenPayload["role"];
@@ -99,7 +99,7 @@ const getOptionalString = (value: unknown) => {
 };
 
 const isUserRole = (value: unknown): value is UserRole => {
-  return value === "conserje" || value === "residente";
+  return value === "conserje" || value === "residente" || value === "administrador";
 };
 
 const normalizeIdentifier = (value: string) => {
@@ -266,6 +266,31 @@ const ensureRoleAccess = (user: AuthTokenPayload, role: UserRole) => {
   return null;
 };
 
+const ensureAdminRequest = (request: Request) => {
+  const auth = ensureAuthenticatedRequest(request);
+
+  if (auth.response) {
+    return { user: null, response: auth.response };
+  }
+
+  if (auth.user.role !== "administrador") {
+    return {
+      user: null,
+      response: jsonResponse(
+        { error: "Acceso restringido a administradores" },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return { user: auth.user, response: null };
+};
+
+const parseUserId = (pathname: string) => {
+  const id = Number(pathname.split("/").pop());
+  return Number.isInteger(id) && id > 0 ? id : null;
+};
+
 const getPackageById = async (id: number) => {
   const [rows] = await db.query<PackageRow[]>(
     "SELECT * FROM packages WHERE id = ?",
@@ -332,7 +357,7 @@ async function createTables() {
         name VARCHAR(255) NOT NULL,
         email VARCHAR(255) NOT NULL UNIQUE,
         username VARCHAR(255) NOT NULL UNIQUE,
-        role ENUM('conserje', 'residente') NOT NULL DEFAULT 'residente',
+        role ENUM('conserje', 'residente', 'administrador') NOT NULL DEFAULT 'residente',
         password VARCHAR(255) NOT NULL,
         otp_code_hash VARCHAR(255) NULL,
         otp_expires_at DATETIME NULL,
@@ -358,7 +383,7 @@ async function createTables() {
     );
     await ensureUserColumn(
       "role",
-      "role ENUM('conserje', 'residente') NOT NULL DEFAULT 'residente'"
+      "role ENUM('conserje', 'residente', 'administrador') NOT NULL DEFAULT 'residente'"
     );
     await ensureUserColumn("otp_code_hash", "otp_code_hash VARCHAR(255) NULL");
     await ensureUserColumn("otp_expires_at", "otp_expires_at DATETIME NULL");
@@ -366,6 +391,17 @@ async function createTables() {
     await db.query(
       "UPDATE users SET username = CONCAT('user_', id) WHERE username = '' OR username IS NULL"
     );
+
+    // # Si la tabla ya existía sin el valor 'administrador' en el ENUM lo agregamos.
+    const [roleColInfo] = await db.query<RowDataPacket[]>(
+      "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'role'"
+    );
+    if (roleColInfo.length > 0 && !String(roleColInfo[0].COLUMN_TYPE).includes("administrador")) {
+      await db.query(
+        "ALTER TABLE users MODIFY COLUMN role ENUM('conserje', 'residente', 'administrador') NOT NULL DEFAULT 'residente'"
+      );
+      console.log("ENUM de 'role' en 'users' actualizado para incluir 'administrador'.");
+    }
 
     console.log("Tabla 'users' creada o ya existe.");
   } catch (error) {
@@ -1120,6 +1156,85 @@ Bun.serve({
             details: String(error),
           },
           { status: 401 }
+        );
+      }
+    }
+
+    if (method === "GET" && url.pathname === "/api/admin/users") {
+      try {
+        const admin = ensureAdminRequest(request);
+
+        if (admin.response) {
+          return admin.response;
+        }
+
+        const [rows] = await db.query<UserRow[]>(
+          "SELECT id, name, email, username, role, created_at FROM users ORDER BY created_at DESC"
+        );
+
+        const users = rows.map((u) => ({
+          id: String(u.id),
+          name: u.name,
+          email: u.email,
+          username: u.username,
+          role: u.role,
+          created_at: u.created_at,
+        }));
+
+        return jsonResponse({ users });
+      } catch (error) {
+        return jsonResponse(
+          { message: "Error obteniendo usuarios", error: String(error) },
+          { status: 500 }
+        );
+      }
+    }
+
+    if (method === "PATCH" && url.pathname.startsWith("/api/admin/users/")) {
+      try {
+        const admin = ensureAdminRequest(request);
+
+        if (admin.response) {
+          return admin.response;
+        }
+
+        const id = parseUserId(url.pathname);
+
+        if (!id) {
+          return jsonResponse({ error: "id inválido" }, { status: 400 });
+        }
+
+        const body = (await request.json()) as Record<string, unknown>;
+        const newRole = body.role;
+
+        if (!isUserRole(newRole)) {
+          return jsonResponse(
+            { error: "role debe ser conserje, residente o administrador" },
+            { status: 400 }
+          );
+        }
+
+        if (id === admin.user.id) {
+          return jsonResponse(
+            { error: "No puedes cambiar tu propio rol" },
+            { status: 403 }
+          );
+        }
+
+        const [result] = await db.query<ResultSetHeader>(
+          "UPDATE users SET role = ? WHERE id = ?",
+          [newRole, id]
+        );
+
+        if (result.affectedRows === 0) {
+          return jsonResponse({ error: "Usuario no encontrado" }, { status: 404 });
+        }
+
+        return jsonResponse({ message: "Rol actualizado exitosamente", id, role: newRole });
+      } catch (error) {
+        return jsonResponse(
+          { message: "Error actualizando rol", error: String(error) },
+          { status: 500 }
         );
       }
     }
