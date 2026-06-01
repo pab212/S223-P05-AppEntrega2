@@ -7,6 +7,7 @@ import Login from "./pages/Login";
 import Conserje from "./pages/Conserje";
 import Residente from "./pages/Residente";
 import HistorialEncomiendas from "./pages/HistorialEncomiendas";
+import Admin from "./pages/Admin";
 import MainLayout from "./layouts/MainLayout";
 
 type ProtectedRouteProps = {
@@ -89,6 +90,15 @@ const App = () => {
         element={
           <ProtectedRoute allowedRole="residente">
             <Residente />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute allowedRole="administrador">
+            <Admin />
           </ProtectedRoute>
         }
       />

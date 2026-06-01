@@ -14,6 +14,9 @@ const navigationByRole = {
     { labelKey: "nav.packageHistory", to: "/residente" },
     { labelKey: "nav.myPackages", to: "/residente/mis-encomiendas" },
   ],
+  administrador: [
+    { labelKey: "nav.userManagement", to: "/admin" },
+  ],
 };
 
 const MainLayout = ({ children }: { children: ReactNode }) => {

@@ -1,6 +1,6 @@
 import { getStoredLocale, translateText } from "../i18n/translations";
 
-export type Role = "conserje" | "residente";
+export type Role = "conserje" | "residente" | "administrador";
 
 export type AuthUser = {
   id: string;
@@ -100,7 +100,7 @@ const translateAuth = (key: string) => {
 };
 
 const isRole = (value: unknown): value is Role => {
-  return value === "conserje" || value === "residente";
+  return value === "conserje" || value === "residente" || value === "administrador";
 };
 
 const buildUserFromApi = (responseUser: Partial<AuthUser>): AuthUser => {
@@ -476,6 +476,7 @@ export const validateStoredSession = async (token: string): Promise<AuthUser> =>
 };
 
 export const getHomePathForRole = (role: Role) => {
+  if (role === "administrador") return "/admin";
   return role === "conserje" ? "/conserje" : "/residente";
 };
 
