@@ -6,12 +6,13 @@
     "dev": "bun run src/index.ts",
     "start": "bun run src/index.ts",
     "server": "bun run src/server.ts",
+    "express": "bun run src/index.ts",
     "test-auth": "bun run tests/test-auth.ts",
     "test-jwt": "bun run tests/test-jwt-complete.ts",
     "test-endpoints": "bun run tests/test-protected-endpoints.ts",
     "test-db": "bun run tests/test-db.ts",
     "test:packages": "bun run tests/test-package-flow.ts",
-    "crear-admin": "bun run scripts/crear-admin.ts"
+    "crear-admin": "bun run scripts/crear-admin.ts",
     "test:all": "echo '🧪 Running all tests...' && bun run tests/test-jwt-complete.ts && bun run tests/test-auth.ts && bun run tests/validate-data.ts"
   },
   "dependencies": {

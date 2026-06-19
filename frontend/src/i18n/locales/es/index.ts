@@ -17,10 +17,12 @@ const es = {
     role: {
       residente: 'residente',
       conserje: 'conserje',
+      administrador: 'administrador',
     },
     roleLabel: {
       residente: 'Residente',
       conserje: 'Conserje',
+      administrador: 'Administrador',
       resident: 'Residente',
       concierge: 'Conserje',
       administrator: 'Administrador',
@@ -33,6 +35,9 @@ const es = {
     myPackages: 'Mis encomiendas',
     home: 'Inicio',
     notifications: 'Notificaciones',
+    userManagement: 'Gestión de usuarios',
+    authorizedEmails: 'Correos autorizados',
+    auditLogs: 'Registro de auditoría',
   },
   auth: {
     mode: {
@@ -89,6 +94,7 @@ const es = {
       identifier: {
         residente: 'Ej: residente o residente@encombox.cl',
         conserje: 'Ej: conserje o conserje@encombox.cl',
+        administrador: 'Ej: admin o admin@encombox.cl',
       },
       password: {
         login: 'Ingresa tu contraseña',
@@ -135,6 +141,7 @@ const es = {
     destination: {
       residente: 'panel del residente',
       conserje: 'panel de conserjería',
+      administrador: 'panel de administración',
     },
     otpSummary: 'Segundo factor para {{role}} con identificador {{identifier}}.',
     otpExpiresAt: 'El código expira a las {{expiresAt}}.',

@@ -17,10 +17,12 @@ const en = {
     role: {
       residente: 'resident',
       conserje: 'concierge',
+      administrador: 'administrator',
     },
     roleLabel: {
       residente: 'Resident',
       conserje: 'Concierge',
+      administrador: 'Administrator',
       resident: 'Resident',
       concierge: 'Concierge',
       administrator: 'Administrator',
@@ -33,6 +35,9 @@ const en = {
     myPackages: 'My packages',
     home: 'Home',
     notifications: 'Notifications',
+    userManagement: 'User management',
+    authorizedEmails: 'Authorized emails',
+    auditLogs: 'Audit log',
   },
   auth: {
     mode: {
@@ -89,6 +94,7 @@ const en = {
       identifier: {
         residente: 'Example: residente or residente@encombox.cl',
         conserje: 'Example: conserje or conserje@encombox.cl',
+        administrador: 'Example: admin or admin@encombox.cl',
       },
       password: {
         login: 'Enter your password',
@@ -135,6 +141,7 @@ const en = {
     destination: {
       residente: 'resident dashboard',
       conserje: 'concierge dashboard',
+      administrador: 'admin dashboard',
     },
     otpSummary: 'Second factor for {{role}} using identifier {{identifier}}.',
     otpExpiresAt: 'The code expires at {{expiresAt}}.',
