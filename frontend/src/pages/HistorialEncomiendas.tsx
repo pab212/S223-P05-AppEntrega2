@@ -5,11 +5,13 @@ import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import {
   PackageApiError,
+  deletePackage,
   fetchPackages,
   updatePackage,
   type PackageItem,
   type PackageStatus,
 } from "../services/packages";
+import { toastApiError, toastSuccess, toastWarning } from "../lib/toast";
 
 // # Este estado opcional llega desde la pantalla de registro para destacar
 // # la encomienda recién creada cuando aterrizamos en el historial.
@@ -132,7 +134,6 @@ const HistorialEncomiendas = () => {
   const [packages, setPackages] = useState<PackageItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
-  const [statusMessage, setStatusMessage] = useState("");
   const [updatingPackageId, setUpdatingPackageId] = useState<number | null>(
     null
   );
@@ -142,6 +143,11 @@ const HistorialEncomiendas = () => {
   const [editErrors, setEditErrors] =
     useState<EditPackageFormErrors>(initialEditErrors);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // # Guardamos el paquete pendiente de borrado para mostrar el modal de
+  // # confirmación antes de ejecutar una acción destructiva e irreversible.
+  const [deleteTarget, setDeleteTarget] = useState<PackageItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // # Esta fecha máxima alimenta el input y la validación del formulario de edición.
   const maxDeliveryDate = getTodayDateValue();
@@ -263,7 +269,6 @@ const HistorialEncomiendas = () => {
     setEditingPackageId(packageItem.id);
     setEditFormData(buildEditFormData(packageItem));
     setEditErrors(initialEditErrors);
-    setStatusMessage("");
   };
 
   const handleCancelEdit = () => {
@@ -289,7 +294,6 @@ const HistorialEncomiendas = () => {
   };
 
   const handleMarkAsDelivered = async (packageItem: PackageItem) => {
-    setStatusMessage("");
     setUpdatingPackageId(packageItem.id);
 
     try {
@@ -304,7 +308,7 @@ const HistorialEncomiendas = () => {
         )
       );
 
-      setStatusMessage(
+      toastSuccess(
         t("historial.statusUpdate.success", {
           recipient: updatedPackage.recipient_name,
         })
@@ -321,13 +325,54 @@ const HistorialEncomiendas = () => {
         return;
       }
 
-      setStatusMessage(
-        error instanceof Error
-          ? error.message
-          : t("historial.statusUpdate.error")
-      );
+      toastApiError(error);
     } finally {
       setUpdatingPackageId(null);
+    }
+  };
+
+  const handleRequestDelete = (packageItem: PackageItem) => {
+    setDeleteTarget(packageItem);
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteTarget(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) {
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      await deletePackage(deleteTarget.id);
+
+      setPackages((currentPackages) =>
+        currentPackages.filter((currentPackage) => currentPackage.id !== deleteTarget.id)
+      );
+
+      toastSuccess(
+        t("historial.delete.success", { recipient: deleteTarget.recipient_name })
+      );
+
+      setDeleteTarget(null);
+    } catch (error) {
+      console.error(error);
+
+      if (
+        error instanceof PackageApiError &&
+        error.code === "UNAUTHORIZED"
+      ) {
+        logout();
+        navigate("/", { replace: true });
+        return;
+      }
+
+      toastApiError(error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -352,14 +397,11 @@ const HistorialEncomiendas = () => {
     setEditErrors(validationErrors);
 
     if (hasEditErrors(validationErrors)) {
-      // # Dejamos un mensaje general arriba del formulario para que el usuario entienda
-      // # por qué el botón no guardó aunque el error específico esté más abajo.
-      setStatusMessage(t("historial.edit.validation.general"));
+      toastWarning(t("historial.edit.validation.general"));
       return;
     }
 
     setIsSavingEdit(true);
-    setStatusMessage("");
 
     try {
       // # Enviamos únicamente la forma esperada por el backend.
@@ -379,7 +421,7 @@ const HistorialEncomiendas = () => {
         )
       );
 
-      setStatusMessage(
+      toastSuccess(
         t("historial.edit.success", {
           recipient: updatedPackage.recipient_name,
         })
@@ -398,9 +440,7 @@ const HistorialEncomiendas = () => {
         return;
       }
 
-      setStatusMessage(
-        error instanceof Error ? error.message : t("historial.edit.error")
-      );
+      toastApiError(error);
     } finally {
       setIsSavingEdit(false);
     }
@@ -448,13 +488,6 @@ const HistorialEncomiendas = () => {
               navigationState.recentlyCreatedRecipient ??
               t("historial.recentRecipientFallback"),
           })}
-        </div>
-      )}
-
-      {/* # Este mensaje se usa para éxito o error de actualización de estado. */}
-      {statusMessage && (
-        <div className="rounded-xl border border-white/10 bg-[#2a2a2a] p-4 text-sm text-gray-200">
-          {statusMessage}
         </div>
       )}
 
@@ -775,6 +808,15 @@ const HistorialEncomiendas = () => {
                                   : t("historial.action.markDelivered")}
                               </button>
                             )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleRequestDelete(item)}
+                              disabled={isSavingEdit || isUpdatingCurrentRow}
+                              className="rounded-lg border border-red-500/30 px-3 py-2 text-xs font-semibold text-red-400 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {t("historial.action.delete")}
+                            </button>
                           </div>
                         </td>
                       )}
@@ -783,6 +825,44 @@ const HistorialEncomiendas = () => {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* # Modal de confirmación: evita borrados accidentales antes de una acción irreversible. */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#2a2a2a] p-6 shadow-2xl">
+            <h3 className="text-base font-semibold text-white">
+              {t("historial.delete.title")}
+            </h3>
+
+            <p className="mt-3 text-sm text-gray-300">
+              {t("historial.delete.message", {
+                recipient: deleteTarget.recipient_name,
+              })}
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleCancelDelete}
+                disabled={isDeleting}
+                className="rounded-xl border border-white/10 px-4 py-2 text-sm text-gray-300 transition hover:bg-white/5 disabled:opacity-50"
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConfirmDelete()}
+                disabled={isDeleting}
+                className="rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isDeleting
+                  ? t("historial.action.deleting")
+                  : t("historial.delete.confirm")}
+              </button>
+            </div>
           </div>
         </div>
       )}

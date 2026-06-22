@@ -302,3 +302,11 @@ export const updatePackage = async (
 
   return buildMutationResponse(responseData).package;
 };
+
+export const deletePackage = async (id: number) => {
+  await request(
+    `/api/packages/${id}`,
+    { method: "DELETE" },
+    "No se pudo eliminar la encomienda."
+  );
+};
