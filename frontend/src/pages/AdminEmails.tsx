@@ -8,6 +8,7 @@ import {
 } from "../services/adminEmails";
 import type { Role } from "../services/auth";
 import { useI18n } from "../context/I18nContext";
+import { toastApiError, toastSuccess } from "../lib/toast";
 
 const ALL_ROLES: Role[] = ["residente", "conserje", "administrador"];
 
@@ -60,14 +61,14 @@ const AdminEmails = () => {
     if (!trimmed) return;
 
     setAdding(true);
-    setError("");
     try {
       const created = await addAuthorizedEmail(trimmed, newRole);
       setEmails((prev) => [created, ...prev]);
       setNewEmail("");
       emailInputRef.current?.focus();
-    } catch {
-      setError(t("adminEmails.error.add"));
+      toastSuccess();
+    } catch (error) {
+      toastApiError(error);
     } finally {
       setAdding(false);
     }
@@ -83,7 +84,6 @@ const AdminEmails = () => {
     if (!role) return;
 
     setSaving((prev) => ({ ...prev, [id]: true }));
-    setError("");
     try {
       await updateAuthorizedEmailRole(id, role);
       setEmails((prev) => prev.map((e) => (e.id === id ? { ...e, role } : e)));
@@ -96,8 +96,9 @@ const AdminEmails = () => {
       setTimeout(() => {
         setSavedFeedback((prev) => ({ ...prev, [id]: false }));
       }, 2000);
-    } catch {
-      setError(t("adminEmails.error.updateRole"));
+      toastSuccess();
+    } catch (error) {
+      toastApiError(error);
     } finally {
       setSaving((prev) => ({ ...prev, [id]: false }));
     }
@@ -105,12 +106,12 @@ const AdminEmails = () => {
 
   const handleDelete = async (id: string) => {
     setDeleting((prev) => ({ ...prev, [id]: true }));
-    setError("");
     try {
       await deleteAuthorizedEmail(id);
       setEmails((prev) => prev.filter((e) => e.id !== id));
-    } catch {
-      setError(t("adminEmails.error.delete"));
+      toastSuccess();
+    } catch (error) {
+      toastApiError(error);
     } finally {
       setDeleting((prev) => ({ ...prev, [id]: false }));
     }

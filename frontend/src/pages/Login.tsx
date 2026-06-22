@@ -12,10 +12,12 @@ import LanguageSwitcher from "../components/LanguageSwitcher";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import {
+  getAuthErrorMessage,
   getHomePathForRole,
   type PendingOtpChallenge,
   type Role,
 } from "../services/auth";
+import { toastError, toastInfo, toastSuccess } from "../lib/toast";
 
 type AuthMode = "login" | "register";
 type AuthStep = "credentials" | "otp";
@@ -98,7 +100,6 @@ const Login = () => {
   const [formData, setFormData] = useState<AuthFormState>(initialFormState);
   const [fieldErrors, setFieldErrors] =
     useState<AuthFieldErrors>(initialFieldErrors);
-  const [successMessage, setSuccessMessage] = useState("");
   const [isGoogleReady, setIsGoogleReady] = useState(false);
   const [pendingOtpChallenge, setPendingOtpChallenge] =
     useState<PendingOtpChallenge | null>(null);
@@ -196,15 +197,13 @@ const Login = () => {
 
   // Declaramos estos helpers antes del Effect Event para que React Compiler pueda seguir sus capturas.
   const resetFeedback = () => {
-    setSuccessMessage("");
-
     if (authError) {
       clearAuthError();
     }
   };
 
   const handleSuccessfulAuth = (role: Role, message: string) => {
-    setSuccessMessage(message);
+    toastSuccess(message);
     redirectTimeoutRef.current = window.setTimeout(() => {
       navigate(getHomePathForRole(role), { replace: true });
     }, 800);
@@ -224,8 +223,8 @@ const Login = () => {
           destination: t(`auth.destination.${authenticatedUser.role}`),
         })
       );
-    } catch {
-      setSuccessMessage("");
+    } catch (error) {
+      toastError(getAuthErrorMessage(error));
     }
   });
 
@@ -471,7 +470,7 @@ const Login = () => {
           ...current,
           otpCode: "",
         }));
-        setSuccessMessage(
+        toastInfo(
           loginResult.challenge.otpCode
             ? t("auth.success.otpSentWithPreview", {
                 code: loginResult.challenge.otpCode,
@@ -496,8 +495,8 @@ const Login = () => {
           destination: t(`auth.destination.${registeredUser.role}`),
         })
       );
-    } catch {
-      setSuccessMessage("");
+    } catch (error) {
+      toastError(getAuthErrorMessage(error));
     }
   };
 
@@ -813,31 +812,19 @@ const Login = () => {
               </div>
             )}
 
-            <div aria-live="polite" className="min-h-0 transition">
-              {/* # Este bloque concentra loading, error y éxito para que el feedback siempre aparezca en el mismo lugar. */}
-              {isAuthenticating && (
-                <div className="flex items-center gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-200/30 border-t-emerald-200" />
-                  {authStep === "otp"
-                    ? t("auth.loadingOtp")
-                    : t(`auth.loading${mode === "login" ? "Login" : "Register"}`, {
-                        role: t(`common.role.${formData.role}`),
-                      })}
-                </div>
-              )}
-
-              {!isAuthenticating && authError && (
-                <div className="rounded-2xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-sm text-red-200">
-                  {authError}
-                </div>
-              )}
-
-              {!isAuthenticating && !authError && successMessage && (
-                <div className="rounded-2xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
-                  {successMessage}
-                </div>
-              )}
-            </div>
+            {isAuthenticating && (
+              <div
+                aria-live="polite"
+                className="flex items-center gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100"
+              >
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-200/30 border-t-emerald-200" />
+                {authStep === "otp"
+                  ? t("auth.loadingOtp")
+                  : t(`auth.loading${mode === "login" ? "Login" : "Register"}`, {
+                      role: t(`common.role.${formData.role}`),
+                    })}
+              </div>
+            )}
 
             <button
               type="submit"

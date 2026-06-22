@@ -10,6 +10,7 @@ import {
 } from "../services/admin";
 import type { Role } from "../services/auth";
 import { useI18n } from "../context/I18nContext";
+import { toastApiError, toastSuccess } from "../lib/toast";
 
 const ALL_ROLES: Role[] = ["residente", "conserje", "administrador"];
 
@@ -112,7 +113,6 @@ const Admin = () => {
     if (!modal) return;
 
     setConfirmando(true);
-    setError("");
 
     try {
       if (modal.tipo === "rol") {
@@ -144,8 +144,9 @@ const Admin = () => {
       }
 
       setModal(null);
-    } catch {
-      setError(t("admin.error.action"));
+      toastSuccess();
+    } catch (error) {
+      toastApiError(error);
     } finally {
       setConfirmando(false);
     }

@@ -647,6 +647,32 @@ type RootTranslation = {
 			 * Y​a​ ​e​n​t​r​e​g​a​d​a
 			 */
 			alreadyDelivered: string
+			/**
+			 * E​l​i​m​i​n​a​r
+			 */
+			'delete': string
+			/**
+			 * E​l​i​m​i​n​a​n​d​o​.​.​.
+			 */
+			deleting: string
+		}
+		'delete': {
+			/**
+			 * E​l​i​m​i​n​a​r​ ​e​n​c​o​m​i​e​n​d​a
+			 */
+			title: string
+			/**
+			 * ¿​S​e​g​u​r​o​ ​q​u​e​ ​d​e​s​e​a​s​ ​e​l​i​m​i​n​a​r​ ​l​a​ ​e​n​c​o​m​i​e​n​d​a​ ​d​e​ ​{​{​r​e​c​i​p​i​e​n​t​}​}​?​ ​E​s​t​a​ ​a​c​c​i​ó​n​ ​n​o​ ​s​e​ ​p​u​e​d​e​ ​d​e​s​h​a​c​e​r​.
+			 */
+			message: string
+			/**
+			 * E​l​i​m​i​n​a​r
+			 */
+			confirm: string
+			/**
+			 * L​a​ ​e​n​c​o​m​i​e​n​d​a​ ​d​e​ ​{​{​r​e​c​i​p​i​e​n​t​}​}​ ​f​u​e​ ​e​l​i​m​i​n​a​d​a​.
+			 */
+			success: string
 		}
 		statusUpdate: {
 			/**
@@ -1850,6 +1876,32 @@ export type TranslationFunctions = {
 			 * Ya entregada
 			 */
 			alreadyDelivered: () => LocalizedString
+			/**
+			 * Eliminar
+			 */
+			'delete': () => LocalizedString
+			/**
+			 * Eliminando...
+			 */
+			deleting: () => LocalizedString
+		}
+		'delete': {
+			/**
+			 * Eliminar encomienda
+			 */
+			title: () => LocalizedString
+			/**
+			 * ¿Seguro que deseas eliminar la encomienda de {{recipient}}? Esta acción no se puede deshacer.
+			 */
+			message: (arg0: number | string | boolean) => LocalizedString
+			/**
+			 * Eliminar
+			 */
+			confirm: () => LocalizedString
+			/**
+			 * La encomienda de {{recipient}} fue eliminada.
+			 */
+			success: (arg0: number | string | boolean) => LocalizedString
 		}
 		statusUpdate: {
 			/**

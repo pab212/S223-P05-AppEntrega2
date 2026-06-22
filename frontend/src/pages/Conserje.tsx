@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { PackageApiError, createPackage } from "../services/packages";
+import { toastApiError, toastSuccess, toastWarning } from "../lib/toast";
 
 // # Este tipo representa exactamente los nombres que hoy espera el backend.
 // # Así evitamos tener que traducir campos antes del fetch.
@@ -92,12 +93,6 @@ const Conserje = () => {
   const [fieldErrors, setFieldErrors] =
     useState<PackageFormErrors>(initialErrors);
 
-  // # Estado para error general del envío.
-  const [errorMessage, setErrorMessage] = useState("");
-
-  // # Estado para mensaje de éxito cuando el backend responde bien.
-  const [successMessage, setSuccessMessage] = useState("");
-
   // # Estado para bloquear el botón mientras se realiza el POST.
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -147,9 +142,6 @@ const Conserje = () => {
       ...current,
       [name]: "",
     }));
-
-    setErrorMessage("");
-    setSuccessMessage("");
   };
 
   // # Este handler controla la urgencia con dos botones.
@@ -159,9 +151,6 @@ const Conserje = () => {
       ...current,
       urgency,
     }));
-
-    setErrorMessage("");
-    setSuccessMessage("");
   };
 
   // # Este submit:
@@ -171,9 +160,6 @@ const Conserje = () => {
   // # 4. Muestra éxito o error
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
-    setErrorMessage("");
-    setSuccessMessage("");
 
     // # Normalizamos los datos antes de validarlos y enviarlos.
     const normalizedData: PackageFormData = {
@@ -188,7 +174,7 @@ const Conserje = () => {
     setFieldErrors(validationErrors);
 
     if (hasValidationErrors(validationErrors)) {
-      setErrorMessage(t("conserje.validation.general"));
+      toastWarning(t("conserje.validation.general"));
       return;
     }
 
@@ -212,7 +198,7 @@ const Conserje = () => {
 
       // # Incluimos la urgencia en el mensaje visual para que el usuario vea qué eligió,
       // # aunque por ahora esa información no viaje al backend.
-      setSuccessMessage(
+      toastSuccess(
         t("conserje.success", {
           urgency: t(
             normalizedData.urgency === "urgent"
@@ -247,11 +233,7 @@ const Conserje = () => {
         return;
       }
 
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : t("conserje.error.network")
-      );
+      toastApiError(error);
     } finally {
       setIsSubmitting(false);
     }
@@ -410,20 +392,6 @@ const Conserje = () => {
               : t("conserje.urgency.normalHelp")}
           </p>
         </div>
-
-        {/* # Feedback general de error */}
-        {errorMessage && (
-          <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
-            {errorMessage}
-          </div>
-        )}
-
-        {/* # Feedback general de éxito */}
-        {successMessage && (
-          <div className="rounded-lg border border-green-500/40 bg-green-500/10 p-3 text-sm text-green-300">
-            {successMessage}
-          </div>
-        )}
 
         {/* # Botón de envío */}
         {/* # En mobile el botón ocupa todo el ancho, en tablet se alinea a la derecha. */}

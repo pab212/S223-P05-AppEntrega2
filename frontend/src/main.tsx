@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { Toaster } from "sonner";
 import App from "./App";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
@@ -13,6 +14,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <I18nProvider>
         <AuthProvider>
           <App />
+          {/* # Toaster global: vive fuera de las rutas para no desmontarse al navegar. */}
+          <Toaster
+            position="top-right"
+            duration={3000}
+            closeButton
+            richColors
+            theme="dark"
+          />
         </AuthProvider>
       </I18nProvider>
     </BrowserRouter>

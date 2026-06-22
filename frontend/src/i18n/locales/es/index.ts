@@ -206,6 +206,14 @@ const es = {
       editing: 'Editando',
       updating: 'Actualizando...',
       alreadyDelivered: 'Ya entregada',
+      delete: 'Eliminar',
+      deleting: 'Eliminando...',
+    },
+    delete: {
+      title: 'Eliminar encomienda',
+      message: '¿Seguro que deseas eliminar la encomienda de {{recipient}}? Esta acción no se puede deshacer.',
+      confirm: 'Eliminar',
+      success: 'La encomienda de {{recipient}} fue eliminada.',
     },
     statusUpdate: {
       success: 'La encomienda de {recipient} fue marcada como entregada.',

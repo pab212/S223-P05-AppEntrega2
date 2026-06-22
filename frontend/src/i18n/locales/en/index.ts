@@ -206,6 +206,14 @@ const en = {
       editing: 'Editing',
       updating: 'Updating...',
       alreadyDelivered: 'Already delivered',
+      delete: 'Delete',
+      deleting: 'Deleting...',
+    },
+    delete: {
+      title: 'Delete package',
+      message: 'Are you sure you want to delete the package for {{recipient}}? This action cannot be undone.',
+      confirm: 'Delete',
+      success: 'The package for {{recipient}} was deleted.',
     },
     statusUpdate: {
       success: 'The package for {recipient} was marked as delivered.',
