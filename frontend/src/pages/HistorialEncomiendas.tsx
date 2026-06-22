@@ -407,6 +407,7 @@ const HistorialEncomiendas = () => {
   };
 
   const isResidentView = user?.role === "residente";
+  // # Estas claves conservan la estructura histórica del catálogo unificado.
   const descriptionText = isResidentView
     ? t("historial.description_residente")
     : t("historial.description_conserje");

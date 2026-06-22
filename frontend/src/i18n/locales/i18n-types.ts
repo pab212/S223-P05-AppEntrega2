@@ -926,6 +926,309 @@ type RootTranslation = {
 			two: string
 		}
 	}
+	admin: {
+		/**
+		 * P​a​n​e​l​ ​d​e​ ​a​d​m​i​n​i​s​t​r​a​c​i​ó​n
+		 */
+		title: string
+		/**
+		 * G​e​s​t​i​o​n​a​ ​u​s​u​a​r​i​o​s​,​ ​r​o​l​e​s​ ​y​ ​e​s​t​a​d​o​s​ ​d​e​ ​a​c​c​e​s​o​ ​d​e​l​ ​s​i​s​t​e​m​a​.
+		 */
+		description: string
+		/**
+		 * U​s​u​a​r​i​o​s​ ​d​e​l​ ​s​i​s​t​e​m​a
+		 */
+		section: string
+		count: {
+			/**
+			 * {​c​o​u​n​t​}​ ​u​s​u​a​r​i​o​ ​r​e​g​i​s​t​r​a​d​o
+			 * @param {unknown} count
+			 */
+			one: RequiredParams<'count'>
+			/**
+			 * {​c​o​u​n​t​}​ ​u​s​u​a​r​i​o​s​ ​r​e​g​i​s​t​r​a​d​o​s
+			 * @param {unknown} count
+			 */
+			many: RequiredParams<'count'>
+		}
+		/**
+		 * C​a​r​g​a​n​d​o​ ​u​s​u​a​r​i​o​s​.​.​.
+		 */
+		loading: string
+		/**
+		 * N​o​ ​h​a​y​ ​u​s​u​a​r​i​o​s​ ​r​e​g​i​s​t​r​a​d​o​s​.
+		 */
+		empty: string
+		error: {
+			/**
+			 * E​r​r​o​r​ ​a​l​ ​c​a​r​g​a​r​ ​u​s​u​a​r​i​o​s​.
+			 */
+			load: string
+			/**
+			 * E​r​r​o​r​ ​a​l​ ​r​e​a​l​i​z​a​r​ ​l​a​ ​a​c​c​i​ó​n​.
+			 */
+			action: string
+		}
+		table: {
+			/**
+			 * N​o​m​b​r​e
+			 */
+			name: string
+			/**
+			 * E​m​a​i​l​ ​/​ ​U​s​u​a​r​i​o
+			 */
+			identity: string
+			/**
+			 * R​o​l
+			 */
+			role: string
+			/**
+			 * C​a​m​b​i​a​r​ ​r​o​l
+			 */
+			changeRole: string
+			/**
+			 * E​s​t​a​d​o
+			 */
+			status: string
+			/**
+			 * A​c​c​i​o​n​e​s
+			 */
+			actions: string
+			/**
+			 * R​e​g​i​s​t​r​a​d​o
+			 */
+			registered: string
+		}
+		status: {
+			/**
+			 * A​c​t​i​v​o
+			 */
+			activo: string
+			/**
+			 * I​n​a​c​t​i​v​o
+			 */
+			inactivo: string
+			/**
+			 * B​l​o​q​u​e​a​d​o
+			 */
+			bloqueado: string
+		}
+		/**
+		 * T​u​ ​c​u​e​n​t​a
+		 */
+		self: string
+		/**
+		 * N​o​ ​d​i​s​p​o​n​i​b​l​e
+		 */
+		unavailable: string
+		/**
+		 * G​u​a​r​d​a​r
+		 */
+		save: string
+		/**
+		 * G​u​a​r​d​a​n​d​o
+		 */
+		saving: string
+		/**
+		 * G​u​a​r​d​a​d​o
+		 */
+		saved: string
+		action: {
+			/**
+			 * B​l​o​q​u​e​a​r
+			 */
+			block: string
+			/**
+			 * A​c​t​i​v​a​r
+			 */
+			activate: string
+			/**
+			 * E​l​i​m​i​n​a​r
+			 */
+			'delete': string
+		}
+		confirmation: {
+			title: {
+				/**
+				 * C​o​n​f​i​r​m​a​r​ ​c​a​m​b​i​o​ ​d​e​ ​r​o​l
+				 */
+				role: string
+				/**
+				 * C​o​n​f​i​r​m​a​r​ ​c​a​m​b​i​o​ ​d​e​ ​e​s​t​a​d​o
+				 */
+				status: string
+				/**
+				 * C​o​n​f​i​r​m​a​r​ ​e​l​i​m​i​n​a​c​i​ó​n
+				 */
+				'delete': string
+			}
+			/**
+			 * ¿​C​o​n​f​i​r​m​a​s​ ​c​a​m​b​i​a​r​ ​e​l​ ​r​o​l​ ​d​e​ ​"​{​n​a​m​e​}​"​ ​a​ ​"​{​r​o​l​e​}​"​?
+			 * @param {unknown} name
+			 * @param {unknown} role
+			 */
+			role: RequiredParams<'name' | 'role'>
+			status: {
+				/**
+				 * ¿​C​o​n​f​i​r​m​a​s​ ​b​l​o​q​u​e​a​r​ ​l​a​ ​c​u​e​n​t​a​ ​d​e​ ​"​{​n​a​m​e​}​"​?​ ​N​o​ ​p​o​d​r​á​ ​i​n​i​c​i​a​r​ ​s​e​s​i​ó​n​.
+				 * @param {unknown} name
+				 */
+				bloqueado: RequiredParams<'name'>
+				/**
+				 * ¿​C​o​n​f​i​r​m​a​s​ ​d​e​s​a​c​t​i​v​a​r​ ​l​a​ ​c​u​e​n​t​a​ ​d​e​ ​"​{​n​a​m​e​}​"​?
+				 * @param {unknown} name
+				 */
+				inactivo: RequiredParams<'name'>
+				/**
+				 * ¿​C​o​n​f​i​r​m​a​s​ ​r​e​a​c​t​i​v​a​r​ ​l​a​ ​c​u​e​n​t​a​ ​d​e​ ​"​{​n​a​m​e​}​"​?
+				 * @param {unknown} name
+				 */
+				activo: RequiredParams<'name'>
+			}
+			/**
+			 * ¿​E​s​t​á​s​ ​s​e​g​u​r​o​ ​d​e​ ​q​u​e​ ​d​e​s​e​a​s​ ​e​l​i​m​i​n​a​r​ ​p​e​r​m​a​n​e​n​t​e​m​e​n​t​e​ ​l​a​ ​c​u​e​n​t​a​ ​d​e​ ​"​{​n​a​m​e​}​"​?​ ​E​s​t​a​ ​a​c​c​i​ó​n​ ​n​o​ ​s​e​ ​p​u​e​d​e​ ​d​e​s​h​a​c​e​r​.
+			 * @param {unknown} name
+			 */
+			'delete': RequiredParams<'name'>
+			/**
+			 * A​d​v​e​r​t​e​n​c​i​a​:​ ​e​s​t​a​ ​a​c​c​i​ó​n​ ​e​l​i​m​i​n​a​r​á​ ​p​e​r​m​a​n​e​n​t​e​m​e​n​t​e​ ​a​l​ ​u​s​u​a​r​i​o​ ​y​ ​n​o​ ​p​u​e​d​e​ ​r​e​v​e​r​t​i​r​s​e​.
+			 */
+			warning: string
+			/**
+			 * P​r​o​c​e​s​a​n​d​o​.​.​.
+			 */
+			processing: string
+			/**
+			 * C​o​n​f​i​r​m​a​r
+			 */
+			confirm: string
+		}
+	}
+	adminEmails: {
+		/**
+		 * C​o​r​r​e​o​s​ ​a​u​t​o​r​i​z​a​d​o​s
+		 */
+		title: string
+		/**
+		 * S​i​ ​s​e​ ​d​e​f​i​n​e​ ​a​l​ ​m​e​n​o​s​ ​u​n​ ​c​o​r​r​e​o​ ​p​a​r​a​ ​u​n​ ​r​o​l​,​ ​s​o​l​o​ ​e​s​o​s​ ​c​o​r​r​e​o​s​ ​p​o​d​r​á​n​ ​i​n​i​c​i​a​r​ ​s​e​s​i​ó​n​ ​c​o​n​ ​e​s​e​ ​r​o​l​.
+		 */
+		description: string
+		/**
+		 * A​g​r​e​g​a​r​ ​c​o​r​r​e​o​ ​a​u​t​o​r​i​z​a​d​o
+		 */
+		addSection: string
+		field: {
+			/**
+			 * C​o​r​r​e​o​ ​e​l​e​c​t​r​ó​n​i​c​o
+			 */
+			email: string
+			/**
+			 * R​o​l
+			 */
+			role: string
+		}
+		/**
+		 * u​s​u​a​r​i​o​@​e​j​e​m​p​l​o​.​c​l
+		 */
+		placeholder: string
+		/**
+		 * A​g​r​e​g​a​r
+		 */
+		add: string
+		/**
+		 * A​g​r​e​g​a​n​d​o
+		 */
+		adding: string
+		/**
+		 * C​o​r​r​e​o​s​ ​a​u​t​o​r​i​z​a​d​o​s
+		 */
+		listSection: string
+		count: {
+			/**
+			 * {​c​o​u​n​t​}​ ​c​o​r​r​e​o​ ​r​e​g​i​s​t​r​a​d​o
+			 * @param {unknown} count
+			 */
+			one: RequiredParams<'count'>
+			/**
+			 * {​c​o​u​n​t​}​ ​c​o​r​r​e​o​s​ ​r​e​g​i​s​t​r​a​d​o​s
+			 * @param {unknown} count
+			 */
+			many: RequiredParams<'count'>
+		}
+		/**
+		 * C​a​r​g​a​n​d​o​ ​c​o​r​r​e​o​s​.​.​.
+		 */
+		loading: string
+		/**
+		 * N​o​ ​h​a​y​ ​c​o​r​r​e​o​s​ ​a​u​t​o​r​i​z​a​d​o​s​.​ ​T​o​d​o​s​ ​l​o​s​ ​u​s​u​a​r​i​o​s​ ​p​u​e​d​e​n​ ​i​n​g​r​e​s​a​r​ ​a​ ​c​u​a​l​q​u​i​e​r​ ​r​o​l​.
+		 */
+		empty: string
+		/**
+		 * p​o​r​ ​{​n​a​m​e​}
+		 * @param {unknown} name
+		 */
+		createdBy: RequiredParams<'name'>
+		table: {
+			/**
+			 * C​o​r​r​e​o
+			 */
+			email: string
+			/**
+			 * R​o​l​ ​a​c​t​u​a​l
+			 */
+			currentRole: string
+			/**
+			 * C​a​m​b​i​a​r​ ​r​o​l
+			 */
+			changeRole: string
+			/**
+			 * R​e​g​i​s​t​r​a​d​o
+			 */
+			registered: string
+			/**
+			 * E​l​i​m​i​n​a​r
+			 */
+			'delete': string
+		}
+		/**
+		 * G​u​a​r​d​a​r
+		 */
+		save: string
+		/**
+		 * G​u​a​r​d​a​n​d​o
+		 */
+		saving: string
+		/**
+		 * G​u​a​r​d​a​d​o
+		 */
+		saved: string
+		/**
+		 * E​l​i​m​i​n​a​r
+		 */
+		'delete': string
+		/**
+		 * E​l​i​m​i​n​a​n​d​o
+		 */
+		deleting: string
+		error: {
+			/**
+			 * E​r​r​o​r​ ​a​l​ ​c​a​r​g​a​r​ ​c​o​r​r​e​o​s​ ​a​u​t​o​r​i​z​a​d​o​s​.
+			 */
+			load: string
+			/**
+			 * E​r​r​o​r​ ​a​l​ ​a​g​r​e​g​a​r​ ​c​o​r​r​e​o​.
+			 */
+			add: string
+			/**
+			 * E​r​r​o​r​ ​a​l​ ​a​c​t​u​a​l​i​z​a​r​ ​e​l​ ​r​o​l​.
+			 */
+			updateRole: string
+			/**
+			 * E​r​r​o​r​ ​a​l​ ​e​l​i​m​i​n​a​r​ ​e​l​ ​c​o​r​r​e​o​.
+			 */
+			'delete': string
+		}
+	}
 }
 
 export type TranslationFunctions = {
@@ -1819,6 +2122,298 @@ export type TranslationFunctions = {
 			 * Encomienda 2 - Pendiente
 			 */
 			two: () => LocalizedString
+		}
+	}
+	admin: {
+		/**
+		 * Panel de administración
+		 */
+		title: () => LocalizedString
+		/**
+		 * Gestiona usuarios, roles y estados de acceso del sistema.
+		 */
+		description: () => LocalizedString
+		/**
+		 * Usuarios del sistema
+		 */
+		section: () => LocalizedString
+		count: {
+			/**
+			 * {count} usuario registrado
+			 */
+			one: (arg: { count: unknown }) => LocalizedString
+			/**
+			 * {count} usuarios registrados
+			 */
+			many: (arg: { count: unknown }) => LocalizedString
+		}
+		/**
+		 * Cargando usuarios...
+		 */
+		loading: () => LocalizedString
+		/**
+		 * No hay usuarios registrados.
+		 */
+		empty: () => LocalizedString
+		error: {
+			/**
+			 * Error al cargar usuarios.
+			 */
+			load: () => LocalizedString
+			/**
+			 * Error al realizar la acción.
+			 */
+			action: () => LocalizedString
+		}
+		table: {
+			/**
+			 * Nombre
+			 */
+			name: () => LocalizedString
+			/**
+			 * Email / Usuario
+			 */
+			identity: () => LocalizedString
+			/**
+			 * Rol
+			 */
+			role: () => LocalizedString
+			/**
+			 * Cambiar rol
+			 */
+			changeRole: () => LocalizedString
+			/**
+			 * Estado
+			 */
+			status: () => LocalizedString
+			/**
+			 * Acciones
+			 */
+			actions: () => LocalizedString
+			/**
+			 * Registrado
+			 */
+			registered: () => LocalizedString
+		}
+		status: {
+			/**
+			 * Activo
+			 */
+			activo: () => LocalizedString
+			/**
+			 * Inactivo
+			 */
+			inactivo: () => LocalizedString
+			/**
+			 * Bloqueado
+			 */
+			bloqueado: () => LocalizedString
+		}
+		/**
+		 * Tu cuenta
+		 */
+		self: () => LocalizedString
+		/**
+		 * No disponible
+		 */
+		unavailable: () => LocalizedString
+		/**
+		 * Guardar
+		 */
+		save: () => LocalizedString
+		/**
+		 * Guardando
+		 */
+		saving: () => LocalizedString
+		/**
+		 * Guardado
+		 */
+		saved: () => LocalizedString
+		action: {
+			/**
+			 * Bloquear
+			 */
+			block: () => LocalizedString
+			/**
+			 * Activar
+			 */
+			activate: () => LocalizedString
+			/**
+			 * Eliminar
+			 */
+			'delete': () => LocalizedString
+		}
+		confirmation: {
+			title: {
+				/**
+				 * Confirmar cambio de rol
+				 */
+				role: () => LocalizedString
+				/**
+				 * Confirmar cambio de estado
+				 */
+				status: () => LocalizedString
+				/**
+				 * Confirmar eliminación
+				 */
+				'delete': () => LocalizedString
+			}
+			/**
+			 * ¿Confirmas cambiar el rol de "{name}" a "{role}"?
+			 */
+			role: (arg: { name: unknown, role: unknown }) => LocalizedString
+			status: {
+				/**
+				 * ¿Confirmas bloquear la cuenta de "{name}"? No podrá iniciar sesión.
+				 */
+				bloqueado: (arg: { name: unknown }) => LocalizedString
+				/**
+				 * ¿Confirmas desactivar la cuenta de "{name}"?
+				 */
+				inactivo: (arg: { name: unknown }) => LocalizedString
+				/**
+				 * ¿Confirmas reactivar la cuenta de "{name}"?
+				 */
+				activo: (arg: { name: unknown }) => LocalizedString
+			}
+			/**
+			 * ¿Estás seguro de que deseas eliminar permanentemente la cuenta de "{name}"? Esta acción no se puede deshacer.
+			 */
+			'delete': (arg: { name: unknown }) => LocalizedString
+			/**
+			 * Advertencia: esta acción eliminará permanentemente al usuario y no puede revertirse.
+			 */
+			warning: () => LocalizedString
+			/**
+			 * Procesando...
+			 */
+			processing: () => LocalizedString
+			/**
+			 * Confirmar
+			 */
+			confirm: () => LocalizedString
+		}
+	}
+	adminEmails: {
+		/**
+		 * Correos autorizados
+		 */
+		title: () => LocalizedString
+		/**
+		 * Si se define al menos un correo para un rol, solo esos correos podrán iniciar sesión con ese rol.
+		 */
+		description: () => LocalizedString
+		/**
+		 * Agregar correo autorizado
+		 */
+		addSection: () => LocalizedString
+		field: {
+			/**
+			 * Correo electrónico
+			 */
+			email: () => LocalizedString
+			/**
+			 * Rol
+			 */
+			role: () => LocalizedString
+		}
+		/**
+		 * usuario@ejemplo.cl
+		 */
+		placeholder: () => LocalizedString
+		/**
+		 * Agregar
+		 */
+		add: () => LocalizedString
+		/**
+		 * Agregando
+		 */
+		adding: () => LocalizedString
+		/**
+		 * Correos autorizados
+		 */
+		listSection: () => LocalizedString
+		count: {
+			/**
+			 * {count} correo registrado
+			 */
+			one: (arg: { count: unknown }) => LocalizedString
+			/**
+			 * {count} correos registrados
+			 */
+			many: (arg: { count: unknown }) => LocalizedString
+		}
+		/**
+		 * Cargando correos...
+		 */
+		loading: () => LocalizedString
+		/**
+		 * No hay correos autorizados. Todos los usuarios pueden ingresar a cualquier rol.
+		 */
+		empty: () => LocalizedString
+		/**
+		 * por {name}
+		 */
+		createdBy: (arg: { name: unknown }) => LocalizedString
+		table: {
+			/**
+			 * Correo
+			 */
+			email: () => LocalizedString
+			/**
+			 * Rol actual
+			 */
+			currentRole: () => LocalizedString
+			/**
+			 * Cambiar rol
+			 */
+			changeRole: () => LocalizedString
+			/**
+			 * Registrado
+			 */
+			registered: () => LocalizedString
+			/**
+			 * Eliminar
+			 */
+			'delete': () => LocalizedString
+		}
+		/**
+		 * Guardar
+		 */
+		save: () => LocalizedString
+		/**
+		 * Guardando
+		 */
+		saving: () => LocalizedString
+		/**
+		 * Guardado
+		 */
+		saved: () => LocalizedString
+		/**
+		 * Eliminar
+		 */
+		'delete': () => LocalizedString
+		/**
+		 * Eliminando
+		 */
+		deleting: () => LocalizedString
+		error: {
+			/**
+			 * Error al cargar correos autorizados.
+			 */
+			load: () => LocalizedString
+			/**
+			 * Error al agregar correo.
+			 */
+			add: () => LocalizedString
+			/**
+			 * Error al actualizar el rol.
+			 */
+			updateRole: () => LocalizedString
+			/**
+			 * Error al eliminar el correo.
+			 */
+			'delete': () => LocalizedString
 		}
 	}
 }

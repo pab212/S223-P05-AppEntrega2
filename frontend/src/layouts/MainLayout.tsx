@@ -5,12 +5,10 @@ import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import type { TranslationKey } from "../i18n";
+import type { Role } from "../services/auth";
 
-// Tipar las etiquetas aquí hace que una ruta de traducción inválida falle durante el build.
-const navigationByRole: Record<
-  "conserje" | "residente" | "administrador",
-  { labelKey: TranslationKey; to: string }[]
-> = {
+// # `satisfies` valida las claves sin ensancharlas a string.
+const navigationByRole = {
   conserje: [
     { labelKey: "nav.registerPackage", to: "/conserje" },
     { labelKey: "nav.history", to: "/conserje/historial" },
@@ -24,7 +22,7 @@ const navigationByRole: Record<
     { labelKey: "nav.authorizedEmails", to: "/admin/correos" },
     { labelKey: "nav.auditLogs", to: "/admin/logs" },
   ],
-};
+} satisfies Record<Role, { labelKey: TranslationKey; to: string }[]>;
 
 const MainLayout = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();

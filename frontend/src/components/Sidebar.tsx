@@ -8,6 +8,7 @@ const Sidebar = () => {
 
   if (!user) return null;
 
+  // # El menú es exhaustivo para los tres roles soportados por autenticación.
   const menu: Record<Role, { key: string; label: string }[]> = {
     conserje: [
       { key: "nav.home", label: t("nav.home") },
