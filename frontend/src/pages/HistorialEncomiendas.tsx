@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -172,9 +172,8 @@ const HistorialEncomiendas = () => {
     });
   };
 
-  // # `useEffectEvent` nos deja reutilizar la carga en `useEffect` y en botones de recarga
-  // # sin pelear con dependencias innecesarias del hook.
-  const loadPackages = useEffectEvent(async () => {
+  // useCallback permite compartir la carga entre el efecto inicial y los controles manuales.
+  const loadPackages = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage("");
 
@@ -202,12 +201,12 @@ const HistorialEncomiendas = () => {
     } finally {
       setIsLoading(false);
     }
-  });
+  }, [logout, navigate, recipientFilter, t]);
 
   // # Cada vez que cambia el usuario filtrado recargamos el historial correcto.
   useEffect(() => {
     void loadPackages();
-  }, [recipientFilter]);
+  }, [loadPackages]);
 
   // # Esta función transforma un paquete del backend al formato del formulario editable.
   const buildEditFormData = (packageItem: PackageItem): EditPackageFormData => {

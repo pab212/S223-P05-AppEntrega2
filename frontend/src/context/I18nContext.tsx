@@ -1,14 +1,17 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo } from "react";
 import type { ReactNode } from "react";
 import {
   getLocaleTag,
   getStoredLocale,
   localeLabels,
   setStoredLocale,
+  translateFromFunctions,
   type Locale,
   type Translate,
-} from "../services/i18n";
-import { translate } from "../services/translationLoader";
+} from "../i18n";
+import TypesafeI18n, {
+  useI18nContext as useTypesafeI18nContext,
+} from "../i18n/locales/i18n-react";
 
 type I18nContextType = {
   locale: Locale;
@@ -21,8 +24,8 @@ type I18nContextType = {
 
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
-export const I18nProvider = ({ children }: { children: ReactNode }) => {
-  const [locale, setLocaleState] = useState<Locale>(getStoredLocale);
+const I18nBridge = ({ children }: { children: ReactNode }) => {
+  const { locale, setLocale, LL } = useTypesafeI18nContext();
 
   useEffect(() => {
     // # Guardamos el idioma elegido para que el usuario no tenga que cambiarlo en cada visita.
@@ -34,21 +37,28 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
     return {
       locale,
       localeTag,
-      setLocale: setLocaleState,
-      // # El contexto expone la única función de traducción, ya validada por TranslationKey.
-      t: (key, params) => translate(locale, key, params),
+      setLocale,
+      // El runtime oficial resuelve pluralización e interpolación; el adaptador solo acepta claves generadas.
+      t: (key, params) => translateFromFunctions(LL, key, params),
       formatDate: (value, options) => {
         const parsedDate = value instanceof Date ? value : new Date(value);
         return new Intl.DateTimeFormat(localeTag, options).format(parsedDate);
       },
       localeLabels,
     };
-  }, [locale]);
+  }, [LL, locale, setLocale]);
 
   return (
     <I18nContext.Provider value={contextValue}>{children}</I18nContext.Provider>
   );
 };
+
+export const I18nProvider = ({ children }: { children: ReactNode }) => (
+  // El locale persistido inicializa el Provider generado; sus cambios se guardan desde I18nBridge.
+  <TypesafeI18n locale={getStoredLocale()}>
+    <I18nBridge>{children}</I18nBridge>
+  </TypesafeI18n>
+);
 
 export const useI18n = () => {
   const context = useContext(I18nContext);

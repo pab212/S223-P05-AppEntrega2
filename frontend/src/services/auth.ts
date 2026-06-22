@@ -1,5 +1,8 @@
-import { getStoredLocale, type TranslationKey } from "./i18n";
-import { translate } from "./translationLoader";
+import {
+  getStoredLocale,
+  translateForLocale,
+  type TranslationKey,
+} from "../i18n";
 
 export type Role = "conserje" | "residente" | "administrador";
 
@@ -96,9 +99,9 @@ const AUTH_API_URL =
 
 export const AUTH_STORAGE_KEY = "encombox.auth.session";
 
-// # Los servicios sin acceso al contexto React reutilizan el mismo catálogo tipado.
+// Los servicios fuera de React usan el mismo runtime y las mismas claves generadas que los componentes.
 const translateAuth = (key: TranslationKey) => {
-  return translate(getStoredLocale(), key);
+  return translateForLocale(getStoredLocale(), key);
 };
 
 const isRole = (value: unknown): value is Role => {
