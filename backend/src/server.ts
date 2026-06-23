@@ -14,7 +14,85 @@
  */
 
 import db from "./db";
+import { verifyToken, type TokenPayload } from "./utils/jwt";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
+
+type PackageStatus = "received" | "delivered" | "pending" | "atraso";
+
+const packageStatuses: PackageStatus[] = [
+  "received",
+  "delivered",
+  "pending",
+  "atraso",
+];
+
+const statusUpdateOptions: PackageStatus[] = [
+  "delivered",
+  "pending",
+  "atraso",
+];
+
+const isPackageStatus = (value: unknown): value is PackageStatus => {
+  return typeof value === "string" && packageStatuses.includes(value as PackageStatus);
+};
+
+const isStatusUpdateOption = (value: unknown): value is PackageStatus => {
+  return typeof value === "string" && statusUpdateOptions.includes(value as PackageStatus);
+};
+
+const getAuthenticatedUser = (request: Request) => {
+  const authHeader = request.headers.get("authorization");
+
+  if (!authHeader) {
+    return {
+      error: Response.json(
+        { error: "Token requerido en header Authorization" },
+        { status: 401 }
+      ),
+    };
+  }
+
+  const [scheme, token] = authHeader.split(" ");
+
+  if (scheme !== "Bearer" || !token) {
+    return {
+      error: Response.json(
+        { error: "Formato de token invalido. Use: Authorization: Bearer <token>" },
+        { status: 401 }
+      ),
+    };
+  }
+
+  try {
+    return { user: verifyToken(token) as TokenPayload };
+  } catch {
+    return {
+      error: Response.json(
+        { error: "Token invalido o expirado" },
+        { status: 401 }
+      ),
+    };
+  }
+};
+
+const requireConserje = (request: Request) => {
+  const auth = getAuthenticatedUser(request);
+
+  if (auth.error) {
+    return auth;
+  }
+
+  if (auth.user.role !== "conserje") {
+    return {
+      error: Response.json(
+        { error: "Solo un conserje puede cambiar el estado de una encomienda" },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return auth;
+};
 
 /**
  * FUNCIÓN: createTables
@@ -33,7 +111,7 @@ import type { RowDataPacket, ResultSetHeader } from "mysql2";
  * - description: Descripción del paquete (opcional)
  * - sender: Remitente del paquete (requerido)
  * - delivery_date: Fecha de entrega (opcional)
- * - status: Estado del paquete (received, pending, delivered)
+ * - status: Estado del paquete (received, pending, delivered, atraso)
  * - created_at: Fecha de creación automática
  */
 async function createTables() {
@@ -74,11 +152,12 @@ async function createTables() {
         delivery_date TIMESTAMP NULL,
         -- Fecha y hora de entrega (puede ser null si no se ha entregado)
         
-        status ENUM('received', 'delivered', 'pending') DEFAULT 'received',
-        -- Estado del paquete (solo 3 valores válidos)
+        status ENUM('received', 'delivered', 'pending', 'atraso') DEFAULT 'received',
+        -- Estado del paquete (4 valores válidos)
         -- 'received': Paquete recibido en conserje
         -- 'pending': Esperando ser entregado al destinatario
         -- 'delivered': Entregado al destinatario
+        -- 'atraso': Paquete con atraso
         
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         -- Fecha y hora de creación del registro (automática)
@@ -101,7 +180,7 @@ await createTables();
  * 
  * VALIDACIONES IMPLEMENTADAS:
  * - Campos requeridos: recipient_name, apartment_number, sender
- * - Estados válidos: received, pending, delivered
+ * - Estados válidos: received, pending, delivered, atraso
  * - Tipos de datos: strings con límites de longitud
  * - Manejo de errores: 400 (bad request), 404 (not found), 500 (server error)
  */
@@ -219,7 +298,7 @@ Bun.serve({
      * - sender: Requerido, máximo 255 caracteres
      * - description: Opcional, texto libre
      * - delivery_date: Opcional, formato TIMESTAMP
-     * - status: Opcional, valores: 'received', 'pending', 'delivered' (default: 'received')
+     * - status: Opcional, valores: 'received', 'pending', 'delivered', 'atraso' (default: 'received')
      * 
      * Códigos de respuesta:
      * - 200: Paquete creado exitosamente
@@ -256,6 +335,13 @@ Bun.serve({
           );
         }
 
+        if (!isPackageStatus(status)) {
+          return Response.json(
+            { error: "status debe ser received, pending, delivered o atraso" },
+            { status: 400 }
+          );
+        }
+
         // Insertar el nuevo paquete en la BD
         // Usa prepared statements (?) para prevenir SQL injection
         const [result] = await db.query<ResultSetHeader>(
@@ -272,6 +358,68 @@ Bun.serve({
         return Response.json(
           {
             message: "Error insertando paquete",
+            error: String(error),
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    /**
+     * ENDPOINT: PUT /api/packages/:id/status
+     *
+     * Actualiza solo el estado de una encomienda.
+     * Acceso: solo usuarios con rol conserje.
+     */
+    if (
+      request.method === "PUT" &&
+      /^\/api\/packages\/\d+\/status$/.test(url.pathname)
+    ) {
+      try {
+        const auth = requireConserje(request);
+
+        if (auth.error) {
+          return auth.error;
+        }
+
+        const id = url.pathname.split("/")[3];
+        const body = (await request.json()) as Record<string, unknown>;
+        const { status } = body;
+
+        if (!isStatusUpdateOption(status)) {
+          return Response.json(
+            { error: "status debe ser pending, delivered o atraso" },
+            { status: 400 }
+          );
+        }
+
+        const [result] = await db.query<ResultSetHeader>(
+          "UPDATE packages SET status = ? WHERE id = ?",
+          [status, id]
+        );
+
+        if (result.affectedRows === 0) {
+          return Response.json(
+            { error: "Paquete no encontrado" },
+            { status: 404 }
+          );
+        }
+
+        const [rows] = await db.query<RowDataPacket[]>(
+          "SELECT * FROM packages WHERE id = ?",
+          [id]
+        );
+
+        return Response.json({
+          message: "Estado actualizado exitosamente",
+          id: Number(id),
+          package: rows[0],
+          updatedBy: auth.user.email,
+        });
+      } catch (error) {
+        return Response.json(
+          {
+            message: "Error actualizando estado",
             error: String(error),
           },
           { status: 500 }
@@ -357,7 +505,7 @@ Bun.serve({
      *   "description": "Nueva descripción",      // Opcional
      *   "sender": "Nuevo remitente",             // Opcional
      *   "delivery_date": "2026-04-18 15:30:00", // Opcional
-     *   "status": "delivered"                    // Opcional (valid: received, pending, delivered)
+     *   "status": "delivered"                    // Opcional (valid: received, pending, delivered, atraso)
      * }
      * 
      * Ejemplo de petición:
@@ -398,6 +546,21 @@ Bun.serve({
             { error: "Al menos un campo debe ser proporcionado" },
             { status: 400 }
           );
+        }
+
+        if (status) {
+          const auth = requireConserje(request);
+
+          if (auth.error) {
+            return auth.error;
+          }
+
+          if (!isPackageStatus(status)) {
+            return Response.json(
+              { error: "status debe ser received, pending, delivered o atraso" },
+              { status: 400 }
+            );
+          }
         }
 
         // Construir la consulta UPDATE dinámicamente
@@ -448,9 +611,15 @@ Bun.serve({
           );
         }
 
+        const [rows] = await db.query<RowDataPacket[]>(
+          "SELECT * FROM packages WHERE id = ?",
+          [id]
+        );
+
         return Response.json({
           message: "Paquete actualizado exitosamente",
-          id: id,
+          id: Number(id),
+          package: rows[0],
         });
       } catch (error) {
         return Response.json(
