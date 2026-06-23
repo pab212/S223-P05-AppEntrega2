@@ -1,6 +1,107 @@
 import db from "./db";
+import { verifyToken, type TokenPayload } from "./utils/jwt";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
 
+<<<<<<< Updated upstream
+=======
+type PackageStatus = "received" | "delivered" | "pending" | "atraso";
+
+const packageStatuses: PackageStatus[] = [
+  "received",
+  "delivered",
+  "pending",
+  "atraso",
+];
+
+const statusUpdateOptions: PackageStatus[] = [
+  "delivered",
+  "pending",
+  "atraso",
+];
+
+const isPackageStatus = (value: unknown): value is PackageStatus => {
+  return typeof value === "string" && packageStatuses.includes(value as PackageStatus);
+};
+
+const isStatusUpdateOption = (value: unknown): value is PackageStatus => {
+  return typeof value === "string" && statusUpdateOptions.includes(value as PackageStatus);
+};
+
+const getAuthenticatedUser = (request: Request) => {
+  const authHeader = request.headers.get("authorization");
+
+  if (!authHeader) {
+    return {
+      error: Response.json(
+        { error: "Token requerido en header Authorization" },
+        { status: 401 }
+      ),
+    };
+  }
+
+  const [scheme, token] = authHeader.split(" ");
+
+  if (scheme !== "Bearer" || !token) {
+    return {
+      error: Response.json(
+        { error: "Formato de token invalido. Use: Authorization: Bearer <token>" },
+        { status: 401 }
+      ),
+    };
+  }
+
+  try {
+    return { user: verifyToken(token) as TokenPayload };
+  } catch {
+    return {
+      error: Response.json(
+        { error: "Token invalido o expirado" },
+        { status: 401 }
+      ),
+    };
+  }
+};
+
+const requireConserje = (request: Request) => {
+  const auth = getAuthenticatedUser(request);
+
+  if (auth.error) {
+    return auth;
+  }
+
+  if (auth.user.role !== "conserje") {
+    return {
+      error: Response.json(
+        { error: "Solo un conserje puede cambiar el estado de una encomienda" },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return auth;
+};
+
+/**
+ * FUNCIÓN: createTables
+ * 
+ * Objetivo: Crear la estructura de la tabla 'packages' en MySQL
+ * 
+ * Lógica:
+ * 1. Verifica si la tabla 'packages' ya existe
+ * 2. Si existe, la elimina (para garantizar estructura limpia)
+ * 3. Crea la tabla con la estructura correcta
+ * 
+ * Estructura de 'packages':
+ * - id: Identificador único (autoincremento)
+ * - recipient_name: Nombre del destinatario (requerido)
+ * - apartment_number: Número de apartamento (requerido)
+ * - description: Descripción del paquete (opcional)
+ * - sender: Remitente del paquete (requerido)
+ * - delivery_date: Fecha de entrega (opcional)
+ * - status: Estado del paquete (received, pending, delivered)
+ * - created_at: Fecha de creación automática
+ */
+>>>>>>> Stashed changes
 async function createTables() {
   try {
     await db.query(`
@@ -11,7 +112,18 @@ async function createTables() {
         description TEXT,
         sender VARCHAR(255) NOT NULL,
         delivery_date TIMESTAMP NULL,
+<<<<<<< Updated upstream
         status ENUM('received', 'delivered', 'pending') DEFAULT 'received',
+=======
+        -- Fecha y hora de entrega (puede ser null si no se ha entregado)
+        
+        status ENUM('received', 'delivered', 'pending', 'atraso') DEFAULT 'received',
+        -- Estado del paquete (solo 3 valores válidos)
+        -- 'received': Paquete recibido en conserje
+        -- 'pending': Esperando ser entregado al destinatario
+        -- 'delivered': Entregado al destinatario
+        
+>>>>>>> Stashed changes
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -93,6 +205,18 @@ Bun.serve({
           );
         }
 
+<<<<<<< Updated upstream
+=======
+        if (!isPackageStatus(status)) {
+          return Response.json(
+            { error: "status debe ser received, pending, delivered o atraso" },
+            { status: 400 }
+          );
+        }
+
+        // Insertar el nuevo paquete en la BD
+        // Usa prepared statements (?) para prevenir SQL injection
+>>>>>>> Stashed changes
         const [result] = await db.query<ResultSetHeader>(
           "INSERT INTO packages (recipient_name, apartment_number, description, sender, delivery_date, status) VALUES (?, ?, ?, ?, ?, ?)",
           [recipient_name, apartment_number, description, sender, delivery_date || null, status]
@@ -113,6 +237,101 @@ Bun.serve({
       }
     }
 
+<<<<<<< Updated upstream
+=======
+    /**
+     * ENDPOINT: PUT /api/packages/:id/status
+     *
+     * Actualiza solo el estado de una encomienda.
+     * Acceso: solo usuarios con rol conserje.
+     */
+    if (
+      request.method === "PUT" &&
+      /^\/api\/packages\/\d+\/status$/.test(url.pathname)
+    ) {
+      try {
+        const auth = requireConserje(request);
+
+        if (auth.error) {
+          return auth.error;
+        }
+
+        const id = url.pathname.split("/")[3];
+        const body = (await request.json()) as Record<string, unknown>;
+        const { status } = body;
+
+        if (!isStatusUpdateOption(status)) {
+          return Response.json(
+            { error: "status debe ser pending, delivered o atraso" },
+            { status: 400 }
+          );
+        }
+
+        const [result] = await db.query<ResultSetHeader>(
+          "UPDATE packages SET status = ? WHERE id = ?",
+          [status, id]
+        );
+
+        if (result.affectedRows === 0) {
+          return Response.json(
+            { error: "Paquete no encontrado" },
+            { status: 404 }
+          );
+        }
+
+        const [rows] = await db.query<RowDataPacket[]>(
+          "SELECT * FROM packages WHERE id = ?",
+          [id]
+        );
+
+        return Response.json({
+          message: "Estado actualizado exitosamente",
+          id: Number(id),
+          package: rows[0],
+          updatedBy: auth.user.email,
+        });
+      } catch (error) {
+        return Response.json(
+          {
+            message: "Error actualizando estado",
+            error: String(error),
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    /**
+     * ENDPOINT: GET /api/packages/:id
+     * 
+     * Propósito: Obtener los detalles de un paquete específico por su ID
+     * 
+     * Parámetro:
+     * - id: Identificador numérico del paquete (en la URL)
+     * 
+     * Ejemplo de petición:
+     * GET /api/packages/1
+     * 
+     * Respuesta exitosa:
+     * {
+     *   "package": {
+     *     "id": 1,
+     *     "recipient_name": "Juan García",
+     *     "apartment_number": "101",
+     *     "description": "Paquete electrónico",
+     *     "sender": "Amazon",
+     *     "delivery_date": null,
+     *     "status": "received",
+     *     "created_at": "2026-04-18 02:40:55"
+     *   }
+     * }
+     * 
+     * Códigos de respuesta:
+     * - 200: Paquete encontrado
+     * - 404: Paquete no existe
+     * - 500: Error en la base de datos
+     */
+>>>>>>> Stashed changes
     if (request.method === "GET" && url.pathname.startsWith("/api/packages/")) {
       try {
         const id = url.pathname.split("/").pop();
@@ -157,7 +376,27 @@ Bun.serve({
           );
         }
 
+<<<<<<< Updated upstream
         // Construir query dinámicamente
+=======
+        if (status) {
+          const auth = requireConserje(request);
+
+          if (auth.error) {
+            return auth.error;
+          }
+
+          if (!isPackageStatus(status)) {
+            return Response.json(
+              { error: "status debe ser received, pending, delivered o atraso" },
+              { status: 400 }
+            );
+          }
+        }
+
+        // Construir la consulta UPDATE dinámicamente
+        // Solo incluye los campos que fueron proporcionados en el cuerpo
+>>>>>>> Stashed changes
         const updates: string[] = [];
         const values: unknown[] = [];
 
@@ -200,9 +439,15 @@ Bun.serve({
           );
         }
 
+        const [rows] = await db.query<RowDataPacket[]>(
+          "SELECT * FROM packages WHERE id = ?",
+          [id]
+        );
+
         return Response.json({
           message: "Paquete actualizado exitosamente",
-          id: id,
+          id: Number(id),
+          package: rows[0],
         });
       } catch (error) {
         return Response.json(
@@ -250,4 +495,18 @@ Bun.serve({
   },
 });
 
+<<<<<<< Updated upstream
 console.log("Backend corriendo en http://localhost:3001");
+=======
+// ========================================
+// INICIO DEL SERVIDOR
+// ========================================
+console.log("🚀 Backend corriendo en http://localhost:3001");
+console.log("📊 Endpoints disponibles:");
+console.log("   GET  /                      → Prueba de conexión");
+console.log("   GET  /api/packages          → Obtener todos los paquetes");
+console.log("   POST /api/packages          → Crear nuevo paquete");
+console.log("   GET  /api/packages/:id      → Obtener paquete específico");
+console.log("   PUT  /api/packages/:id      → Actualizar paquete");
+console.log("   DELETE /api/packages/:id    → Eliminar paquete");
+>>>>>>> Stashed changes
