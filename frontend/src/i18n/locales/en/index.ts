@@ -253,6 +253,7 @@ const en = {
     title: 'Register package',
     field: {
       recipient: 'Resident name *',
+      recipientEmail: 'Resident email *',
       apartment: 'Apartment *',
       sender: 'Sender *',
       deliveryDate: 'Delivery date *',
@@ -260,6 +261,7 @@ const en = {
     },
     placeholder: {
       recipient: 'Example: Camila Soto',
+      recipientEmail: 'Example: camila@encombox.cl',
       apartment: 'Example: 101 or A-12',
       sender: 'Example: Mercado Libre',
     },
@@ -273,6 +275,10 @@ const en = {
     validation: {
       recipient: {
         required: 'Resident name is required.',
+      },
+      recipientEmail: {
+        required: 'Resident email is required to send the QR.',
+        invalid: 'Enter a valid email to send the QR.',
       },
       apartment: {
         required: 'Apartment is required.',
@@ -298,6 +304,22 @@ const en = {
     },
     submit: 'Register package',
     submitting: 'Registering...',
+    verify: {
+      title: 'Verify pickup QR',
+      description: 'Scan the QR the resident received by email. If it is valid, the package will be marked as delivered.',
+      success: 'The package for {recipient} was verified and delivered.',
+      error: 'The pickup QR could not be verified.',
+      scanner: {
+        start: 'Scan QR',
+        stop: 'Stop camera',
+        help: 'Point the camera at the QR the resident received in their email.',
+        error: 'The camera could not be started to scan the QR. Check permissions and try again.',
+      },
+      resultTitle: 'Pickup confirmed',
+      resultRecipient: 'Resident: {recipient}',
+      resultApartment: 'Apartment: {apartment}',
+      resultSender: 'Sender: {sender}',
+    },
   },
   residente: {
     title: 'My packages',
