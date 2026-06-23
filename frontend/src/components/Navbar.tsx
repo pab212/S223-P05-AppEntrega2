@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useI18n } from "../context/I18nContext";
 import LanguageSwitcher from "./LanguageSwitcher";
+import NotificationBadge from "./NotificationBadge";
+import NotificationsList from "./NotificationsList";
 
 type NavbarProps = {
   onToggleMobileNavigation?: () => void;
@@ -11,6 +14,7 @@ const Navbar = ({ onToggleMobileNavigation }: NavbarProps) => {
   const { user, logout } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -41,6 +45,15 @@ const Navbar = ({ onToggleMobileNavigation }: NavbarProps) => {
       {user && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <LanguageSwitcher />
+          
+          {/* NOTIFICATION BADGE */}
+          <div className="relative">
+            <NotificationBadge
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="transition-transform hover:scale-110"
+            />
+          </div>
+
           <div className="min-w-0 text-left sm:text-right">
             <p className="text-sm font-medium text-white truncate">{user.name}</p>
             <p className="text-xs text-gray-400 truncate">
@@ -53,6 +66,20 @@ const Navbar = ({ onToggleMobileNavigation }: NavbarProps) => {
             className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-500"
           >
             {t("common.logout")}
+          </button>
+        </div>
+      )}
+
+      {/* PANEL DE NOTIFICACIONES (desplegable) */}
+      {user && showNotifications && (
+        <div className="absolute right-4 top-full z-50 mt-2 w-96 max-w-[calc(100vw-2rem)] rounded-lg border border-white/10 bg-[#252525] p-4 shadow-2xl">
+          <NotificationsList />
+          <button
+            onClick={() => setShowNotifications(false)}
+            className="absolute right-2 top-2 text-gray-400 hover:text-white"
+            aria-label="Cerrar panel de notificaciones"
+          >
+            ✕
           </button>
         </div>
       )}
