@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Environment variables (contienen credenciales reales; usar .env.example como plantilla)
+.env
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
