@@ -8,6 +8,7 @@ import { randomBytes } from "crypto";
 import nodemailer from "nodemailer";
 import QRCode from "qrcode";
 import { NotificationService } from "./src/services/notificationService";
+import { startPackageReminderCron } from "./src/services/packagesReminder.task";
 
 type PackageStatus = "received" | "delivered" | "pending";
 type ClaimStatus = "open" | "in_review" | "closed";
@@ -24,6 +25,7 @@ type PackageRow = RowDataPacket & {
   retrieval_code: string | null;
   created_at: string;
   retrieved_at: string | null;
+  last_reminder_sent_at: string | null;
 };
 
 type ClaimRow = RowDataPacket & {
@@ -796,6 +798,12 @@ async function createTables() {
     // # Guarda la fecha y hora exacta en que el residente retiró la encomienda,
     // # para auditoría e historial. Queda NULL hasta que se marca como entregada.
     await ensureColumn("retrieved_at", "retrieved_at TIMESTAMP NULL");
+    // # Evita que el cron de recordatorios (packagesReminder.task.ts) notifique
+    // # más de una vez por día la misma encomienda sin retirar.
+    await ensureColumn(
+      "last_reminder_sent_at",
+      "last_reminder_sent_at TIMESTAMP NULL"
+    );
 
     // # El índice único impide que dos encomiendas activas compartan el mismo identificador QR.
     const [retrievalCodeIndexes] = await db.query<RowDataPacket[]>(
@@ -960,6 +968,8 @@ async function createTables() {
 }
 
 await createTables();
+
+startPackageReminderCron();
 
 Bun.serve({
   port: PORT,
