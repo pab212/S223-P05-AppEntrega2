@@ -16,6 +16,7 @@ import cors from "cors";
 import authRoutes from "./routes/authRoutes";
 import protectedRoutes from "./routes/protectedRoutes";
 import roleBasedRoutes from "./routes/roleBasedRoutes";
+import notificationRoutes from "./routes/notificationRoutes";
 
 /**
  * FUNCIÓN: createApp
@@ -110,6 +111,16 @@ export function createApp(): Express {
    * - DELETE /api/protected/packages/:id      → Eliminar paquete
    */
   app.use("/api/protected", protectedRoutes);
+
+  /**
+   * RUTAS DE NOTIFICACIONES (requieren JWT)
+   * 
+   * Endpoints para manejar notificaciones del usuario autenticado:
+   * - GET    /api/notifications               → Obtener notificaciones con paginación
+   * - PATCH  /api/notifications/:id/read      → Marcar notificación como leída
+   * - PATCH  /api/notifications/read-all      → Marcar todas como leídas
+   */
+  app.use("/api/notifications", notificationRoutes);
 
   /**
    * RUTAS CON CONTROL DE ACCESO POR ROL (requieren JWT + Rol específico)

@@ -5,6 +5,7 @@ import App from "./App";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { I18nProvider } from "./context/I18nContext";
+import { NotificationProvider } from "./context/NotificationContext";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -13,17 +14,20 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <I18nProvider>
         <AuthProvider>
-          <App />
-          {/* # Toaster global: vive fuera de las rutas para no desmontarse al navegar. */}
-          <Toaster
-            position="top-right"
-            duration={3000}
-            closeButton
-            richColors
-            theme="dark"
-          />
+          <NotificationProvider>
+            <App />
+            {/* # Toaster global: vive fuera de las rutas para no desmontarse al navegar. */}
+            <Toaster
+              position="top-right"
+              duration={3000}
+              closeButton
+              richColors
+              theme="dark"
+            />
+          </NotificationProvider>
         </AuthProvider>
       </I18nProvider>
     </BrowserRouter>
   </React.StrictMode>
 );
+
