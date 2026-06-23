@@ -654,6 +654,11 @@ async function createTables() {
       "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'role'"
     );
     if (roleColInfo.length > 0 && !String(roleColInfo[0].COLUMN_TYPE).includes("administrador")) {
+      // # Normalizamos valores que no encajan en la nueva lista (datos viejos o cargados a mano)
+      // # para que el ALTER no falle con "Data truncated" bajo sql_mode estricto.
+      await db.query(
+        "UPDATE users SET role = 'residente' WHERE role NOT IN ('conserje', 'residente', 'administrador')"
+      );
       await db.query(
         "ALTER TABLE users MODIFY COLUMN role ENUM('conserje', 'residente', 'administrador') NOT NULL DEFAULT 'residente'"
       );
