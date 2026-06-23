@@ -1525,8 +1525,6 @@ Bun.serve({
           values.push(getOptionalString(body.delivery_date));
         }
 
-        let transitionedToDelivered = false;
-
         if (hasOwn(body, "status")) {
           if (!isPackageStatus(body.status)) {
             return jsonResponse(
@@ -1535,15 +1533,25 @@ Bun.serve({
             );
           }
 
+          if (
+            body.status === "delivered" &&
+            existingPackage.status !== "delivered"
+          ) {
+            // # La entrega solo puede confirmarse escaneando el QR (/api/confirm-pickup);
+            // # este endpoint de edición no debe permitir saltarse esa validación.
+            return jsonResponse(
+              {
+                error:
+                  "El estado 'delivered' solo puede asignarse escaneando el código QR de retiro.",
+              },
+              { status: 403 }
+            );
+          }
+
           updates.push("status = ?");
           values.push(body.status);
 
-          if (body.status === "delivered") {
-            // # Cualquier entrega manual también invalida el QR para impedir reuso.
-            updates.push("retrieval_code = NULL");
-            updates.push("retrieved_at = COALESCE(retrieved_at, NOW())");
-            transitionedToDelivered = existingPackage.status !== "delivered";
-          } else if (existingPackage.status === "delivered") {
+          if (existingPackage.status === "delivered" && body.status !== "delivered") {
             updates.push("retrieved_at = NULL");
           }
         }
@@ -1576,29 +1584,6 @@ Bun.serve({
             { message: "No se pudo recuperar el paquete actualizado" },
             { status: 500 }
           );
-        }
-
-        if (transitionedToDelivered) {
-          try {
-            const residentUser = await findResidentByEmail(
-              updatedPackage.recipient_email
-            );
-
-            if (residentUser) {
-              await notifyResident({
-                userId: residentUser.id,
-                email: residentUser.email,
-                name: residentUser.name,
-                subject: "Tu encomienda fue entregada",
-                message: `✅ Tu paquete de ${updatedPackage.sender} fue entregado (ID: ${updatedPackage.id}).`,
-              });
-            }
-          } catch (error) {
-            console.error(
-              "[Notification] Error notificando entrega manual de paquete:",
-              error
-            );
-          }
         }
 
         return jsonResponse({

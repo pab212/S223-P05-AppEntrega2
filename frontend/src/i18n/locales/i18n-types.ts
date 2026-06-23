@@ -640,10 +640,6 @@ type RootTranslation = {
 		}
 		action: {
 			/**
-			 * M​a​r​c​a​r​ ​c​o​m​o​ ​e​n​t​r​e​g​a​d​a
-			 */
-			markDelivered: string
-			/**
 			 * E​d​i​t​a​r
 			 */
 			edit: string
@@ -651,10 +647,6 @@ type RootTranslation = {
 			 * E​d​i​t​a​n​d​o
 			 */
 			editing: string
-			/**
-			 * A​c​t​u​a​l​i​z​a​n​d​o​.​.​.
-			 */
-			updating: string
 			/**
 			 * Y​a​ ​e​n​t​r​e​g​a​d​a
 			 */
@@ -685,17 +677,6 @@ type RootTranslation = {
 			 * L​a​ ​e​n​c​o​m​i​e​n​d​a​ ​d​e​ ​{​{​r​e​c​i​p​i​e​n​t​}​}​ ​f​u​e​ ​e​l​i​m​i​n​a​d​a​.
 			 */
 			success: string
-		}
-		statusUpdate: {
-			/**
-			 * L​a​ ​e​n​c​o​m​i​e​n​d​a​ ​d​e​ ​{​r​e​c​i​p​i​e​n​t​}​ ​f​u​e​ ​m​a​r​c​a​d​a​ ​c​o​m​o​ ​e​n​t​r​e​g​a​d​a​.
-			 * @param {unknown} recipient
-			 */
-			success: RequiredParams<'recipient'>
-			/**
-			 * N​o​ ​s​e​ ​p​u​d​o​ ​a​c​t​u​a​l​i​z​a​r​ ​e​l​ ​e​s​t​a​d​o​ ​d​e​ ​l​a​ ​e​n​c​o​m​i​e​n​d​a​.
-			 */
-			error: string
 		}
 		edit: {
 			/**
@@ -2009,10 +1990,6 @@ export type TranslationFunctions = {
 		}
 		action: {
 			/**
-			 * Marcar como entregada
-			 */
-			markDelivered: () => LocalizedString
-			/**
 			 * Editar
 			 */
 			edit: () => LocalizedString
@@ -2020,10 +1997,6 @@ export type TranslationFunctions = {
 			 * Editando
 			 */
 			editing: () => LocalizedString
-			/**
-			 * Actualizando...
-			 */
-			updating: () => LocalizedString
 			/**
 			 * Ya entregada
 			 */
@@ -2054,16 +2027,6 @@ export type TranslationFunctions = {
 			 * La encomienda de {{recipient}} fue eliminada.
 			 */
 			success: (arg0: number | string | boolean) => LocalizedString
-		}
-		statusUpdate: {
-			/**
-			 * La encomienda de {recipient} fue marcada como entregada.
-			 */
-			success: (arg: { recipient: unknown }) => LocalizedString
-			/**
-			 * No se pudo actualizar el estado de la encomienda.
-			 */
-			error: () => LocalizedString
 		}
 		edit: {
 			/**

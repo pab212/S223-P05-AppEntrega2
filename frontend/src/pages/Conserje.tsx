@@ -1,15 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { Html5Qrcode } from "html5-qrcode";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
-import {
-  PackageApiError,
-  createPackage,
-  verifyPackageQr,
-  type PackageItem,
-} from "../services/packages";
+import { PackageApiError, createPackage } from "../services/packages";
 import { toastApiError, toastSuccess, toastWarning } from "../lib/toast";
 
 // # Este tipo representa exactamente los nombres que hoy espera el backend.
@@ -105,16 +99,6 @@ const Conserje = () => {
 
   // # Estado para bloquear el botón mientras se realiza el POST.
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // # Estado del lector QR: el conserje escanea el QR que recibió el residente por correo.
-  const [isScannerActive, setIsScannerActive] = useState(false);
-  const [isVerifyingQr, setIsVerifyingQr] = useState(false);
-  const [scannerError, setScannerError] = useState("");
-  const [verifiedPackage, setVerifiedPackage] = useState<PackageItem | null>(null);
-
-  // # html5-qrcode administra la cámara fuera de React; guardamos la instancia para poder detenerla.
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  // # Evita validar dos veces si la cámara lee el mismo QR en frames consecutivos.
-  const hasScannedQrRef = useRef(false);
 
   // # Esta función valida solo los campos que actualmente usa el backend.
   const validateForm = (values: PackageFormData) => {
@@ -179,131 +163,6 @@ const Conserje = () => {
       urgency,
     }));
   };
-
-  const submitQrVerification = async (retrievalCode: string) => {
-    // # Este valor viene directamente del QR escaneado; el backend decide si sigue activo.
-    setIsVerifyingQr(true);
-    setScannerError("");
-    setVerifiedPackage(null);
-
-    try {
-      const verification = await verifyPackageQr(retrievalCode);
-
-      setVerifiedPackage(verification.package);
-      toastSuccess(
-        verification.message ??
-          t("conserje.verify.success", {
-            recipient: verification.package.recipient_name,
-          })
-      );
-    } catch (error) {
-      console.error(error);
-
-      if (
-        error instanceof PackageApiError &&
-        error.code === "UNAUTHORIZED"
-      ) {
-        logout();
-        navigate("/", { replace: true });
-        return;
-      }
-
-      setScannerError(
-        error instanceof Error ? error.message : t("conserje.verify.error")
-      );
-      toastApiError(error);
-    } finally {
-      setIsVerifyingQr(false);
-    }
-  };
-
-  const stopQrScanner = async (shouldUpdateState = true) => {
-    const scanner = scannerRef.current;
-
-    if (!scanner) {
-      if (shouldUpdateState) {
-        setIsScannerActive(false);
-      }
-      return;
-    }
-
-    try {
-      if (scanner.isScanning) {
-        await scanner.stop();
-      }
-
-      scanner.clear();
-    } catch (error) {
-      console.error(error);
-    } finally {
-      scannerRef.current = null;
-      hasScannedQrRef.current = false;
-
-      if (shouldUpdateState) {
-        setIsScannerActive(false);
-      }
-    }
-  };
-
-  const startQrScanner = async () => {
-    setScannerError("");
-    setVerifiedPackage(null);
-
-    try {
-      setIsScannerActive(true);
-
-      const scanner = new Html5Qrcode("package-qr-reader");
-      scannerRef.current = scanner;
-      hasScannedQrRef.current = false;
-
-      await scanner.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 240, height: 240 },
-        },
-        (decodedText) => {
-          if (hasScannedQrRef.current) {
-            return;
-          }
-
-          const retrievalCode = decodedText.trim();
-
-          if (!retrievalCode) {
-            return;
-          }
-
-          // # Al primer QR válido detenemos la cámara y validamos el retiro una sola vez.
-          hasScannedQrRef.current = true;
-          void stopQrScanner();
-          void submitQrVerification(retrievalCode);
-        },
-        () => {
-          // # Este callback se dispara constantemente mientras busca un QR; lo dejamos silencioso.
-        }
-      );
-    } catch (error) {
-      console.error(error);
-      scannerRef.current = null;
-      setIsScannerActive(false);
-      setScannerError(t("conserje.verify.scanner.error"));
-    }
-  };
-
-  const handleToggleScanner = () => {
-    if (isScannerActive) {
-      void stopQrScanner();
-      return;
-    }
-
-    void startQrScanner();
-  };
-
-  useEffect(() => {
-    return () => {
-      void stopQrScanner(false);
-    };
-  }, []);
 
   // # Este submit:
   // # 1. Valida campos
@@ -400,57 +259,6 @@ const Conserje = () => {
       <h1 className="text-2xl font-semibold text-white">
         {t("conserje.title")}
       </h1>
-
-      {/* # El conserje escanea el QR enviado por correo al residente para confirmar el retiro. */}
-      <section className="flex w-full max-w-xl flex-col gap-4 rounded-xl border border-emerald-500/20 bg-[#2a2a2a] p-4 sm:p-6">
-        <div>
-          <h2 className="text-lg font-semibold text-white">
-            {t("conserje.verify.title")}
-          </h2>
-          <p className="mt-1 text-sm text-gray-400">
-            {t("conserje.verify.description")}
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={handleToggleScanner}
-            disabled={isVerifyingQr}
-            className="rounded border border-emerald-500/40 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isScannerActive
-              ? t("conserje.verify.scanner.stop")
-              : t("conserje.verify.scanner.start")}
-          </button>
-          <p className="text-xs text-gray-500">
-            {t("conserje.verify.scanner.help")}
-          </p>
-          {scannerError && (
-            <p className="text-sm text-red-400">{scannerError}</p>
-          )}
-        </div>
-
-        <div
-          id="package-qr-reader"
-          // # html5-qrcode inserta aquí el video de la cámara mientras el lector está activo.
-          className={`overflow-hidden rounded-lg border border-white/10 bg-[#1f1f1f] ${
-            isScannerActive ? "block min-h-72" : "hidden"
-          }`}
-        />
-
-        {verifiedPackage && (
-          // # Confirmación visible para que el conserje vea qué paquete quedó entregado.
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
-            <p className="font-semibold">
-              {t("conserje.verify.resultTitle")}
-            </p>
-            <p>{t("conserje.verify.resultRecipient", { recipient: verifiedPackage.recipient_name })}</p>
-            <p>{t("conserje.verify.resultApartment", { apartment: verifiedPackage.apartment_number })}</p>
-            <p>{t("conserje.verify.resultSender", { sender: verifiedPackage.sender })}</p>
-          </div>
-        )}
-      </section>
 
       {/* # Tarjeta principal del formulario */}
       <form

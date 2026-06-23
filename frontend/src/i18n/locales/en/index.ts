@@ -204,10 +204,8 @@ const en = {
       pending: 'Pending',
     },
     action: {
-      markDelivered: 'Mark as delivered',
       edit: 'Edit',
       editing: 'Editing',
-      updating: 'Updating...',
       alreadyDelivered: 'Already delivered',
       delete: 'Delete',
       deleting: 'Deleting...',
@@ -217,10 +215,6 @@ const en = {
       message: 'Are you sure you want to delete the package for {{recipient}}? This action cannot be undone.',
       confirm: 'Delete',
       success: 'The package for {{recipient}} was deleted.',
-    },
-    statusUpdate: {
-      success: 'The package for {recipient} was marked as delivered.',
-      error: 'The package status could not be updated.',
     },
     edit: {
       title: 'Edit package',

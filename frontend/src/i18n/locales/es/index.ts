@@ -204,10 +204,8 @@ const es = {
       pending: 'Pendiente',
     },
     action: {
-      markDelivered: 'Marcar como entregada',
       edit: 'Editar',
       editing: 'Editando',
-      updating: 'Actualizando...',
       alreadyDelivered: 'Ya entregada',
       delete: 'Eliminar',
       deleting: 'Eliminando...',
@@ -217,10 +215,6 @@ const es = {
       message: '¿Seguro que deseas eliminar la encomienda de {{recipient}}? Esta acción no se puede deshacer.',
       confirm: 'Eliminar',
       success: 'La encomienda de {{recipient}} fue eliminada.',
-    },
-    statusUpdate: {
-      success: 'La encomienda de {recipient} fue marcada como entregada.',
-      error: 'No se pudo actualizar el estado de la encomienda.',
     },
     edit: {
       title: 'Editar encomienda',

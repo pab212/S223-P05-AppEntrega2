@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
+import { Html5Qrcode } from "html5-qrcode";
 import { useLocation, useNavigate } from "react-router-dom";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { useAuth } from "../context/AuthContext";
@@ -9,6 +10,7 @@ import {
   deletePackage,
   fetchPackages,
   updatePackage,
+  verifyPackageQr,
   type PackageItem,
   type PackageStatus,
 } from "../services/packages";
@@ -135,9 +137,6 @@ const HistorialEncomiendas = () => {
   const [packages, setPackages] = useState<PackageItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
-  const [updatingPackageId, setUpdatingPackageId] = useState<number | null>(
-    null
-  );
   const [editingPackageId, setEditingPackageId] = useState<number | null>(null);
   const [editFormData, setEditFormData] =
     useState<EditPackageFormData>(initialEditFormData);
@@ -149,6 +148,18 @@ const HistorialEncomiendas = () => {
   // # confirmación antes de ejecutar una acción destructiva e irreversible.
   const [deleteTarget, setDeleteTarget] = useState<PackageItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // # Estado del lector QR: el conserje escanea el QR que recibió el residente por correo
+  // # para confirmar el retiro directamente desde el historial.
+  const [isScannerActive, setIsScannerActive] = useState(false);
+  const [isVerifyingQr, setIsVerifyingQr] = useState(false);
+  const [scannerError, setScannerError] = useState("");
+  const [verifiedPackage, setVerifiedPackage] = useState<PackageItem | null>(null);
+
+  // # html5-qrcode administra la cámara fuera de React; guardamos la instancia para poder detenerla.
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  // # Evita validar dos veces si la cámara lee el mismo QR en frames consecutivos.
+  const hasScannedQrRef = useRef(false);
 
   // # Esta fecha máxima alimenta el input y la validación del formulario de edición.
   const maxDeliveryDate = getTodayDateValue();
@@ -237,6 +248,140 @@ const HistorialEncomiendas = () => {
     void loadPackages();
   }, [loadPackages]);
 
+  const submitQrVerification = async (retrievalCode: string) => {
+    // # Este valor viene directamente del QR escaneado; el backend decide si sigue activo.
+    setIsVerifyingQr(true);
+    setScannerError("");
+    setVerifiedPackage(null);
+
+    try {
+      const verification = await verifyPackageQr(retrievalCode);
+
+      setVerifiedPackage(verification.package);
+      // # Reflejamos el nuevo estado "delivered" en la tabla sin esperar un refresh manual.
+      setPackages((currentPackages) =>
+        currentPackages.map((currentPackage) =>
+          currentPackage.id === verification.package.id
+            ? verification.package
+            : currentPackage
+        )
+      );
+
+      toastSuccess(
+        verification.message ??
+          t("conserje.verify.success", {
+            recipient: verification.package.recipient_name,
+          })
+      );
+    } catch (error) {
+      console.error(error);
+
+      if (
+        error instanceof PackageApiError &&
+        error.code === "UNAUTHORIZED"
+      ) {
+        logout();
+        navigate("/", { replace: true });
+        return;
+      }
+
+      setScannerError(
+        error instanceof Error ? error.message : t("conserje.verify.error")
+      );
+      toastApiError(error);
+    } finally {
+      setIsVerifyingQr(false);
+    }
+  };
+
+  const stopQrScanner = async (shouldUpdateState = true) => {
+    const scanner = scannerRef.current;
+
+    if (!scanner) {
+      if (shouldUpdateState) {
+        setIsScannerActive(false);
+      }
+      return;
+    }
+
+    try {
+      if (scanner.isScanning) {
+        await scanner.stop();
+      }
+
+      scanner.clear();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      scannerRef.current = null;
+      hasScannedQrRef.current = false;
+
+      if (shouldUpdateState) {
+        setIsScannerActive(false);
+      }
+    }
+  };
+
+  const startQrScanner = async () => {
+    setScannerError("");
+    setVerifiedPackage(null);
+
+    try {
+      setIsScannerActive(true);
+
+      const scanner = new Html5Qrcode("package-qr-reader");
+      scannerRef.current = scanner;
+      hasScannedQrRef.current = false;
+
+      await scanner.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 240, height: 240 },
+        },
+        (decodedText) => {
+          if (hasScannedQrRef.current) {
+            return;
+          }
+
+          const retrievalCode = decodedText.trim();
+
+          if (!retrievalCode) {
+            return;
+          }
+
+          // # Al primer QR válido detenemos la cámara y validamos el retiro una sola vez.
+          hasScannedQrRef.current = true;
+          void stopQrScanner();
+          void submitQrVerification(retrievalCode);
+        },
+        () => {
+          // # Este callback se dispara constantemente mientras busca un QR; lo dejamos silencioso.
+        }
+      );
+    } catch (error) {
+      console.error(error);
+      scannerRef.current = null;
+      setIsScannerActive(false);
+      setScannerError(t("conserje.verify.scanner.error"));
+    }
+  };
+
+  const handleToggleScanner = () => {
+    if (isScannerActive) {
+      void stopQrScanner();
+      return;
+    }
+
+    void startQrScanner();
+  };
+
+  useEffect(() => {
+    return () => {
+      void stopQrScanner(false);
+    };
+  }, []);
+
   // # Esta función transforma un paquete del backend al formato del formulario editable.
   const buildEditFormData = (packageItem: PackageItem): EditPackageFormData => {
     return {
@@ -314,44 +459,6 @@ const HistorialEncomiendas = () => {
       ...current,
       [name]: "",
     }));
-  };
-
-  const handleMarkAsDelivered = async (packageItem: PackageItem) => {
-    setUpdatingPackageId(packageItem.id);
-
-    try {
-      // # Solo enviamos el estado porque el backend ahora soporta actualizaciones parciales.
-      const updatedPackage = await updatePackage(packageItem.id, {
-        status: "delivered",
-      });
-
-      setPackages((currentPackages) =>
-        currentPackages.map((currentPackage) =>
-          currentPackage.id === updatedPackage.id ? updatedPackage : currentPackage
-        )
-      );
-
-      toastSuccess(
-        t("historial.statusUpdate.success", {
-          recipient: updatedPackage.recipient_name,
-        })
-      );
-    } catch (error) {
-      console.error(error);
-
-      if (
-        error instanceof PackageApiError &&
-        error.code === "UNAUTHORIZED"
-      ) {
-        logout();
-        navigate("/", { replace: true });
-        return;
-      }
-
-      toastApiError(error);
-    } finally {
-      setUpdatingPackageId(null);
-    }
   };
 
   const handleRequestDelete = (packageItem: PackageItem) => {
@@ -503,6 +610,59 @@ const HistorialEncomiendas = () => {
         </div>
       </div>
 
+      {/* # Solo conserjería puede confirmar retiros escaneando el QR enviado al residente. */}
+      {!isResidentView && (
+        <section className="flex w-full flex-col gap-4 rounded-xl border border-emerald-500/20 bg-[#2a2a2a] p-4 sm:p-6">
+          <div>
+            <h2 className="text-lg font-semibold text-white">
+              {t("conserje.verify.title")}
+            </h2>
+            <p className="mt-1 text-sm text-gray-400">
+              {t("conserje.verify.description")}
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={handleToggleScanner}
+              disabled={isVerifyingQr}
+              className="rounded border border-emerald-500/40 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-60 sm:w-fit"
+            >
+              {isScannerActive
+                ? t("conserje.verify.scanner.stop")
+                : t("conserje.verify.scanner.start")}
+            </button>
+            <p className="text-xs text-gray-500">
+              {t("conserje.verify.scanner.help")}
+            </p>
+            {scannerError && (
+              <p className="text-sm text-red-400">{scannerError}</p>
+            )}
+          </div>
+
+          <div
+            id="package-qr-reader"
+            // # html5-qrcode inserta aquí el video de la cámara mientras el lector está activo.
+            className={`overflow-hidden rounded-lg border border-white/10 bg-[#1f1f1f] ${
+              isScannerActive ? "block min-h-72" : "hidden"
+            }`}
+          />
+
+          {verifiedPackage && (
+            // # Confirmación visible para que el conserje vea qué paquete quedó entregado.
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+              <p className="font-semibold">
+                {t("conserje.verify.resultTitle")}
+              </p>
+              <p>{t("conserje.verify.resultRecipient", { recipient: verifiedPackage.recipient_name })}</p>
+              <p>{t("conserje.verify.resultApartment", { apartment: verifiedPackage.apartment_number })}</p>
+              <p>{t("conserje.verify.resultSender", { sender: verifiedPackage.sender })}</p>
+            </div>
+          )}
+        </section>
+      )}
+
       {/* # Si venimos desde el formulario, confirmamos que el alta se reflejó en el historial. */}
       {navigationState.recentlyCreatedId && (
         <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-sm text-green-200">
@@ -643,7 +803,8 @@ const HistorialEncomiendas = () => {
               )}
             </div>
 
-            {/* # Campo estado para que conserjería pueda corregir o actualizar la situación del paquete. */}
+            {/* # Campo estado para que conserjería pueda corregir la situación del paquete.
+                # "delivered" no es una opción aquí: ese estado solo se asigna escaneando el QR. */}
             <div>
               <label htmlFor="edit_status" className="text-sm text-gray-300">
                 {t("historial.table.status")}
@@ -662,7 +823,9 @@ const HistorialEncomiendas = () => {
               >
                 <option value="received">{statusLabels.received}</option>
                 <option value="pending">{statusLabels.pending}</option>
-                <option value="delivered">{statusLabels.delivered}</option>
+                {editFormData.status === "delivered" && (
+                  <option value="delivered">{statusLabels.delivered}</option>
+                )}
               </select>
               {editErrors.status && (
                 <p className="mt-1 text-sm text-red-400">{editErrors.status}</p>
@@ -777,8 +940,6 @@ const HistorialEncomiendas = () => {
 
               <tbody>
                 {packages.map((item) => {
-                  const isUpdatingCurrentRow = updatingPackageId === item.id;
-
                   return (
                     <tr
                       key={item.id}
@@ -822,28 +983,18 @@ const HistorialEncomiendas = () => {
                                 : t("historial.action.edit")}
                             </button>
 
-                            {/* # Esta acción rápida se mantiene porque sigue siendo útil para flujos de retiro. */}
-                            {item.status === "delivered" ? (
+                            {/* # La entrega solo puede confirmarse escaneando el QR de retiro;
+                                # no existe una acción manual de "marcar como entregada". */}
+                            {item.status === "delivered" && (
                               <span className="text-xs text-gray-500">
                                 {t("historial.action.alreadyDelivered")}
                               </span>
-                            ) : (
-                              <button
-                                type="button"
-                                disabled={isUpdatingCurrentRow || isSavingEdit}
-                                onClick={() => void handleMarkAsDelivered(item)}
-                                className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {isUpdatingCurrentRow
-                                  ? t("historial.action.updating")
-                                  : t("historial.action.markDelivered")}
-                              </button>
                             )}
 
                             <button
                               type="button"
                               onClick={() => handleRequestDelete(item)}
-                              disabled={isSavingEdit || isUpdatingCurrentRow}
+                              disabled={isSavingEdit}
                               className="rounded-lg border border-red-500/30 px-3 py-2 text-xs font-semibold text-red-400 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               {t("historial.action.delete")}
